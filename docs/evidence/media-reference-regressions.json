@@ -1,0 +1,19 @@
+{
+  "image": "context-graph/ingestion:secure-v6",
+  "status": "passed",
+  "tests": 8,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "testNames": [
+    "inputRejectsWrongKnownTypesButAllowsUnstructuredObjects",
+    "uploadedPlaylistsCannotOpenNetworkConnections",
+    "envelopePreservesArbitraryPayloadButRejectsMissingMetadata",
+    "uploadedPlaylistsCannotReadOtherLocalMedia",
+    "ffmpegSegmentsStartWithDecodableKeyframes",
+    "playlistIgnoresIncompleteSegments",
+    "imageMagicRejectsPlaylistsAndAcceptsRealPngAndJpeg",
+    "mediaWithoutSidecarAndRemappedLabelsDeny"
+  ],
+  "protocolTestMethod": "Force HLS demuxer in local-file/network attack tests to verify the pipe-only input protocol boundary independently of automatic format detection."
+}

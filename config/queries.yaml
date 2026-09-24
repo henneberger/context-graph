@@ -1,0 +1,65 @@
+registeredTables:
+  context_secure.events: {entityColumn: entity_id}
+  context_secure.metrics: {entityColumn: entity_id}
+  context_secure.nodes: {entityColumn: node_id}
+  context_secure.edges: {entityColumn: source_id, targetEntityColumn: target_id}
+types: |
+  scalar JSON
+  scalar Long
+  type Metric { entity_id: String! metric: String! window_start: String! window_end: String! sample_count: Long! sum_value: Float avg_value: Float min_value: Float max_value: Float }
+  type EntityMetric { entity_id: String! node_type: String metric: String! sample_count: Long! sum_value: Float! }
+  type MetricTotal { metric: String! sample_count: Long! sum_value: Float! }
+  type Node { node_id: String! node_type: String event_time: String source_event_id: String properties: JSON }
+  type Edge { edge_id: String! source_id: String! target_id: String! relation: String event_time: String source_event_id: String properties: JSON }
+  type Event { event_id: String! entity_id: String! endpoint: String kind: String event_time: String ingested_at: String payload: JSON }
+  type VideoPayload { streamId: String! sequence: Int! uri: String! playlistUri: String! durationSeconds: Float! keyframeAligned: Boolean! }
+  type VideoEvent { eventId: String! entityId: String! eventTime: String! payload: VideoPayload! }
+  type GraphEvent { topic: String! entityId: String payload: JSON! }
+queries:
+  entityMetrics:
+    signature: 'entityMetrics(metric: String!, limit: Int = 100): [EntityMetric!]!'
+    sources:
+      graph_nodes: context_secure.nodes
+      metric_windows: context_secure.metrics
+    sql: |
+      WITH latest_nodes AS (
+        SELECT node_id, node_type, row_number() OVER (PARTITION BY node_id ORDER BY event_time DESC) rn
+        FROM graph_nodes
+      )
+      SELECT m.entity_id, n.node_type, m.metric, sum(m.sample_count) AS sample_count, sum(m.sum_value) AS sum_value
+      FROM metric_windows m JOIN latest_nodes n ON m.entity_id=n.node_id AND n.rn=1
+      WHERE m.metric=:metric GROUP BY m.entity_id,n.node_type,m.metric ORDER BY m.entity_id LIMIT :limit
+  metricTotals:
+    signature: 'metricTotals(metric: String!): [MetricTotal!]!'
+    table: context_secure.metrics
+    sql: 'SELECT metric, sum(sample_count) AS sample_count, sum(sum_value) AS sum_value FROM source WHERE metric = :metric GROUP BY metric'
+  metrics:
+    signature: 'metrics(entityId: String, limit: Int = 100): [Metric!]!'
+    table: context_secure.metrics
+    sql: 'SELECT * FROM source WHERE (:entityId IS NULL OR entity_id = :entityId) ORDER BY window_end DESC LIMIT :limit'
+  nodes:
+    signature: 'nodes(limit: Int = 100): [Node!]!'
+    table: context_secure.nodes
+    sql: 'SELECT * EXCLUDE (rn) FROM (SELECT *, row_number() OVER (PARTITION BY node_id ORDER BY event_time DESC) rn FROM source) WHERE rn=1 LIMIT :limit'
+  edges:
+    signature: 'edges(limit: Int = 100): [Edge!]!'
+    table: context_secure.edges
+    sql: 'SELECT * EXCLUDE (rn) FROM (SELECT *, row_number() OVER (PARTITION BY edge_id ORDER BY event_time DESC) rn FROM source) WHERE rn=1 LIMIT :limit'
+  media:
+    signature: 'media(entityId: String, limit: Int = 100): [Event!]!'
+    table: context_secure.events
+    sql: "SELECT * FROM source WHERE kind IN ('image','video') AND (:entityId IS NULL OR entity_id=:entityId) ORDER BY event_time DESC LIMIT :limit"
+subscriptions:
+  metricUpdated:
+    signature: 'metricUpdated(entityId: String): Metric!'
+    topics: [cg.secure.metrics]
+    entityField: entity_id
+  videoChunk:
+    signature: 'videoChunk(entityId: String): VideoEvent!'
+    topics: [cg.secure.video]
+    entityField: entityId
+  graphUpdated:
+    signature: 'graphUpdated(entityId: String): GraphEvent!'
+    topics: [cg.secure.nodes, cg.secure.edges]
+    entityField: node_id
+    wrap: true

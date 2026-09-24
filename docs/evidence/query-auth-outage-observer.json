@@ -1,0 +1,23 @@
+{
+  "samples": 60,
+  "http200": 60,
+  "failures": 0,
+  "latency_ms": {
+    "min": 4.811,
+    "median": 8.424999999999999,
+    "p95": 15.620999999999999,
+    "max": 23.499
+  },
+  "pods": [
+    {
+      "name": "query-64979867cb-qkd95",
+      "ready": true,
+      "restarts": 0
+    },
+    {
+      "name": "query-64979867cb-vbzqh",
+      "ready": true,
+      "restarts": 0
+    }
+  ]
+}

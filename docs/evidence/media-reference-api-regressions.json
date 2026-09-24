@@ -1,0 +1,15 @@
+{
+  "authorizedVideoPlaylist": true,
+  "disjointVideoPlaylistDenied": true,
+  "authorizedVideoChunk": true,
+  "disjointVideoChunkDenied": true,
+  "authorizedVideoKeyframeChunks": 3,
+  "producerBetaVideoPlaylist": true,
+  "localFileReferenceDenied": true,
+  "imagePlaylistReferenceDenied": true,
+  "networkReferenceDenied": true,
+  "unauthorizedVideoUploadDenied": true,
+  "activeVideoUploadRevocation": true,
+  "status": "passed",
+  "rejectedAfterAuthentication": true
+}

@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "savepoint": "s3://context-recovery/savepoints/savepoint-2ef559-530fa95a7215",
+  "jobId": "983f18f9064abe9e24c572b90d872396",
+  "legacyDataVolumeMounted": false,
+  "elapsedSeconds": 52.25,
+  "restored": {
+    "id": 493,
+    "restore_timestamp": 1790283684802,
+    "is_savepoint": true,
+    "external_path": "s3://context-recovery/savepoints/savepoint-2ef559-530fa95a7215"
+  },
+  "completed": {
+    "className": "completed",
+    "id": 495,
+    "status": "COMPLETED",
+    "is_savepoint": false,
+    "savepointFormat": null,
+    "trigger_timestamp": 1790283709917,
+    "latest_ack_timestamp": 1790283710264,
+    "checkpointed_size": 57562,
+    "state_size": 60311,
+    "end_to_end_duration": 347,
+    "alignment_buffered": 0,
+    "processed_data": 296,
+    "persisted_data": 0,
+    "num_subtasks": 10,
+    "num_acknowledged_subtasks": 10,
+    "checkpoint_type": "CHECKPOINT",
+    "tasks": {},
+    "external_path": "s3://context-recovery/checkpoints/983f18f9064abe9e24c572b90d872396/chk-495",
+    "discarded": false
+  }
+}

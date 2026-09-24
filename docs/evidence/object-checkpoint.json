@@ -1,0 +1,21 @@
+{
+  "className": "completed",
+  "id": 421,
+  "status": "COMPLETED",
+  "is_savepoint": false,
+  "savepointFormat": null,
+  "trigger_timestamp": 1790282913101,
+  "latest_ack_timestamp": 1790282913500,
+  "checkpointed_size": 58340,
+  "state_size": 64027,
+  "end_to_end_duration": 399,
+  "alignment_buffered": 0,
+  "processed_data": 148,
+  "persisted_data": 0,
+  "num_subtasks": 10,
+  "num_acknowledged_subtasks": 10,
+  "checkpoint_type": "CHECKPOINT",
+  "tasks": {},
+  "external_path": "s3://context-recovery/checkpoints/70239a076318a6f196a6f290252e47a8/chk-421",
+  "discarded": false
+}

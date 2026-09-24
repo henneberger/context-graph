@@ -1,0 +1,19 @@
+definition user {}
+
+definition workspace {
+    relation administrator: user
+    relation member: user
+    permission access = administrator + member
+    permission manage = administrator
+    permission view_schema = administrator + member
+}
+
+definition entity {
+    // Trusted provisioning enforces exactly one workspace relation.
+    relation workspace: workspace
+    relation restricted: user:*
+    relation reader: user
+    relation writer: user
+    permission view = ((workspace->access - restricted) + reader + writer + workspace->manage) & workspace->access
+    permission ingest = (writer + workspace->manage) & workspace->access
+}

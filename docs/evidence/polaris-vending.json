@@ -1,0 +1,12 @@
+{
+  "vendedSessionToken": true,
+  "unexpired": true,
+  "metadataRead": 200,
+  "otherBucket": 403,
+  "recoveryBucket": 403,
+  "otherPrefix": 403,
+  "write": 403,
+  "credentialRefresh": 200,
+  "readerCreateTable": 403,
+  "anonymousCatalog": 401
+}

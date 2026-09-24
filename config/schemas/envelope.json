@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "eventId",
+    "schemaVersion",
+    "endpoint",
+    "kind",
+    "entityId",
+    "eventTime",
+    "ingestedAt",
+    "payload",
+    "security"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schemaVersion": {
+      "const": 2
+    },
+    "endpoint": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "json",
+        "image",
+        "video"
+      ]
+    },
+    "entityId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "eventTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ingestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "security": {
+      "type": "object",
+      "required": [
+        "workspaceId",
+        "resourceId",
+        "subjectId"
+      ],
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "resourceId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "subjectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "image"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "uri",
+              "width",
+              "height",
+              "contentType",
+              "bytes",
+              "sha256"
+            ],
+            "properties": {
+              "uri": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "contentType": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "video"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "streamId",
+              "sequence",
+              "uri",
+              "playlistUri",
+              "durationSeconds",
+              "keyframeAligned"
+            ],
+            "properties": {
+              "streamId": {
+                "type": "string"
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "uri": {
+                "type": "string"
+              },
+              "playlistUri": {
+                "type": "string"
+              },
+              "durationSeconds": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "keyframeAligned": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

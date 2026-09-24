@@ -1,0 +1,17 @@
+{
+  "ingestionExit": 0,
+  "rollout": {
+    "restartExit": 0,
+    "ingestionReady": true,
+    "queryReady": true,
+    "readyAfterSeconds": 34.36
+  },
+  "querySamples": 85,
+  "queryFailures": [],
+  "queryMeanMs": 563.43,
+  "queryP95Ms": 1927.15,
+  "queryMaxMs": 4447.82,
+  "elapsedSeconds": 90.66,
+  "queryImage": "secure-v5",
+  "preStopSeconds": 5
+}

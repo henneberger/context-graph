@@ -1,0 +1,37 @@
+{
+  "port": 8080,
+  "kafkaBootstrapServers": "localhost:9092",
+  "errorTopic": "cg.secure.errors",
+  "envelopeSchema": "schemas/envelope.json",
+  "errorSchema": "schemas/error.json",
+  "mediaRoot": "/data/media",
+  "maxConcurrentUploads": 16,
+  "maxJsonBytes": 900000,
+  "maxImageBytes": 20971520,
+  "maxVideoBytes": 10737418240,
+  "maxVideoSeconds": 3600,
+  "segmentSeconds": 2,
+  "endpoints": [
+    {
+      "path": "/ingest/events",
+      "name": "events",
+      "kind": "json",
+      "topic": "cg.secure.events",
+      "schema": "schemas/event-input.json"
+    },
+    {
+      "path": "/ingest/images",
+      "name": "images",
+      "kind": "image",
+      "topic": "cg.secure.images",
+      "description": "Raw, self-contained PNG or JPEG image bytes; type validated from file signature."
+    },
+    {
+      "path": "/ingest/video",
+      "name": "video",
+      "kind": "video",
+      "topic": "cg.secure.video",
+      "description": "Raw pipe-decodable video bytes (for example MPEG-TS); playlists and external file/network references are rejected."
+    }
+  ]
+}

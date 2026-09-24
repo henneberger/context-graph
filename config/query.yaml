@@ -1,0 +1,12 @@
+port: 8081
+warehouse: /data/warehouse
+queries: /app/config/queries.yaml
+kafkaBootstrap: kafka:9092
+workers: 4
+queueCapacity: 64
+subscriptionBuffer: 256
+schemaRefreshSeconds: 15
+maxSourceRows: 100000
+maxSourceResources: 10000
+duckdbMemoryLimit: 64MB
+queryTimeoutSeconds: 30

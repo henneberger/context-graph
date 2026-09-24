@@ -1,0 +1,22 @@
+{
+  "spicedb-checks": {
+    "reachable": true,
+    "expected": true
+  },
+  "identity": {
+    "reachable": true,
+    "expected": true
+  },
+  "secure-kafka": {
+    "reachable": true,
+    "expected": true
+  },
+  "spicedb": {
+    "reachable": false,
+    "expected": false
+  },
+  "spicedb-postgres": {
+    "reachable": false,
+    "expected": false
+  }
+}

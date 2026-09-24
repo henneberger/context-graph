@@ -1,0 +1,20 @@
+watchNamespaces: [context-graph]
+webhook: {create: false}
+operatorPod:
+  labels: {context-graph-control-plane: 'true'}
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 768Mi}
+# Operator restart does not stop running jobs. Leader election permits rolling upgrades.
+replicas: 2
+strategy: {type: RollingUpdate}
+defaultConfiguration:
+  config.yaml: |
+    kubernetes:
+      operator:
+        leader-election:
+          enabled: true
+          lease-name: context-graph-operator-leader
+
+jvmArgs:
+  operator: "-Xms128m -Xmx256m -XX:ActiveProcessorCount=2"

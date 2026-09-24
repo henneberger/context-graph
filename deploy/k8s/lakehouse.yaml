@@ -1,0 +1,460 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: private-object-storage
+  namespace: context-graph
+spec:
+  podSelector:
+    matchExpressions:
+    - key: context-graph-role
+      operator: In
+      values:
+      - object-storage
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - polaris
+          - processor
+          - ingestion
+          - query
+          - lakehouse-admin
+    ports:
+    - port: 9000
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: private-polaris
+  namespace: context-graph
+spec:
+  podSelector:
+    matchExpressions:
+    - key: context-graph-role
+      operator: In
+      values:
+      - polaris
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - processor
+          - query
+          - lakehouse-admin
+    ports:
+    - port: 8443
+  egress:
+  - to:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - object-storage
+    ports:
+    - port: 9000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: spicedb-postgres
+    ports:
+    - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: polaris-bootstrap
+  namespace: context-graph
+spec:
+  podSelector:
+    matchExpressions:
+    - key: context-graph-role
+      operator: In
+      values:
+      - polaris-bootstrap
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: spicedb-postgres
+    ports:
+    - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-polaris-access
+  namespace: context-graph
+spec:
+  podSelector:
+    matchLabels:
+      app: spicedb-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - polaris
+          - polaris-bootstrap
+    ports:
+    - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lakehouse-egress-polaris
+  namespace: context-graph
+spec:
+  podSelector:
+    matchExpressions:
+    - key: context-graph-role
+      operator: In
+      values:
+      - query
+      - processor
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - polaris
+    ports:
+    - port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lakehouse-egress-object-storage
+  namespace: context-graph
+spec:
+  podSelector:
+    matchExpressions:
+    - key: context-graph-role
+      operator: In
+      values:
+      - query
+      - processor
+      - ingestion
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchExpressions:
+        - key: context-graph-role
+          operator: In
+          values:
+          - object-storage
+    ports:
+    - port: 9000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: object-storage
+  namespace: context-graph
+spec:
+  selector:
+    app: object-storage
+  ports:
+  - name: https
+    port: 9000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: object-storage
+  namespace: context-graph
+spec:
+  serviceName: object-storage
+  replicas: 1
+  selector:
+    matchLabels:
+      app: object-storage
+  template:
+    metadata:
+      labels:
+        app: object-storage
+        context-graph-role: object-storage
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 10001
+      initContainers:
+      - name: permissions
+        image: busybox:1.37
+        command:
+        - sh
+        - -ec
+        - chown 10001:10001 /data
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: objects
+          mountPath: /data
+      containers:
+      - name: rustfs
+        image: rustfs/rustfs:1.0.0-beta.8
+        env:
+        - name: RUSTFS_VOLUMES
+          value: /data
+        - name: RUSTFS_ADDRESS
+          value: :9000
+        - name: RUSTFS_CONSOLE_ENABLE
+          value: 'false'
+        - name: RUSTFS_TLS_PATH
+          value: /tls
+        - name: RUSTFS_REGION
+          value: us-east-1
+        - name: RUSTFS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-security
+              key: access-key
+        - name: RUSTFS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-security
+              key: secret-key
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 768Mi
+        ports:
+        - containerPort: 9000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: objects
+          mountPath: /data
+        - name: tls
+          mountPath: /tls
+          readOnly: true
+      volumes:
+      - name: tls
+        secret:
+          secretName: object-storage-security
+          defaultMode: 288
+  volumeClaimTemplates:
+  - metadata:
+      name: objects
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: polaris-bootstrap-v170
+  namespace: context-graph
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        context-graph-role: polaris-bootstrap
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 185
+      restartPolicy: OnFailure
+      containers:
+      - name: bootstrap
+        image: apache/polaris-admin-tool:1.7.0
+        command:
+        - /bin/sh
+        - -ec
+        args:
+        - exec /opt/jboss/container/java/run/run-java.sh bootstrap --realm=POLARIS
+          --credential="$(cat /run/polaris/bootstrap-credential)"
+        env:
+        - name: POLARIS_PERSISTENCE_TYPE
+          value: relational-jdbc
+        - name: POLARIS_PERSISTENCE_RELATIONAL_JDBC_DATABASE_TYPE
+          value: postgresql
+        - name: QUARKUS_DATASOURCE_JDBC_URL
+          value: jdbc:postgresql://spicedb-postgres:5432/polaris?sslmode=verify-full&sslrootcert=/run/polaris/ca.crt
+        - name: QUARKUS_DATASOURCE_USERNAME
+          value: polaris
+        - name: QUARKUS_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: polaris-security
+              key: pg-password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+        volumeMounts:
+        - name: security
+          mountPath: /run/polaris
+          readOnly: true
+      volumes:
+      - name: security
+        secret:
+          secretName: polaris-security
+          defaultMode: 288
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polaris
+  namespace: context-graph
+spec:
+  selector:
+    app: polaris
+  ports:
+  - name: https
+    port: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polaris
+  namespace: context-graph
+spec:
+  replicas: 2
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: polaris
+  template:
+    metadata:
+      labels:
+        app: polaris
+        context-graph-role: polaris
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 185
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: polaris
+        image: apache/polaris:1.7.0
+        env:
+        - name: POLARIS_PERSISTENCE_TYPE
+          value: relational-jdbc
+        - name: POLARIS_PERSISTENCE_RELATIONAL_JDBC_DATABASE_TYPE
+          value: postgresql
+        - name: QUARKUS_DATASOURCE_JDBC_URL
+          value: jdbc:postgresql://spicedb-postgres:5432/polaris?sslmode=verify-full&sslrootcert=/run/polaris/ca.crt
+        - name: QUARKUS_DATASOURCE_USERNAME
+          value: polaris
+        - name: QUARKUS_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: polaris-security
+              key: pg-password
+        - name: POLARIS_REALM_CONTEXT_REALMS
+          value: POLARIS
+        - name: POLARIS_AUTHENTICATION_TOKEN_BROKER_RSA_KEY_PAIR_PUBLIC_KEY_FILE
+          value: /run/polaris/signing.pub
+        - name: POLARIS_AUTHENTICATION_TOKEN_BROKER_RSA_KEY_PAIR_PRIVATE_KEY_FILE
+          value: /run/polaris/signing.key
+        - name: POLARIS_AUTHENTICATION_TOKEN_BROKER_MAX_TOKEN_GENERATION
+          value: PT15M
+        - name: QUARKUS_HTTP_SSL_CERTIFICATE_FILES
+          value: /run/polaris/server.crt
+        - name: QUARKUS_HTTP_SSL_CERTIFICATE_KEY_FILES
+          value: /run/polaris/server.key
+        - name: QUARKUS_HTTP_SSL_PORT
+          value: '8443'
+        - name: QUARKUS_HTTP_INSECURE_REQUESTS
+          value: disabled
+        - name: QUARKUS_OTEL_SDK_DISABLED
+          value: 'true'
+        - name: JAVA_OPTS_APPEND
+          value: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/run/polaris/kafka.truststore.p12
+            -Djavax.net.ssl.trustStorePassword=changeit
+        - name: AWS_REGION
+          value: us-east-1
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-warehouse
+              key: access-key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-warehouse
+              key: secret-key
+        ports:
+        - containerPort: 8443
+        resources:
+          requests:
+            cpu: 100m
+            memory: 384Mi
+          limits:
+            memory: 768Mi
+        readinessProbe:
+          httpGet:
+            path: /q/health/ready
+            port: 8182
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /q/health/started
+            port: 8182
+          failureThreshold: 40
+          periodSeconds: 3
+        volumeMounts:
+        - name: security
+          mountPath: /run/polaris
+          readOnly: true
+      volumes:
+      - name: security
+        secret:
+          secretName: polaris-security
+          defaultMode: 288
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: polaris
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: polaris

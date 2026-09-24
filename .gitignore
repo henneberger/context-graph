@@ -1,0 +1,9 @@
+**/target/
+**/node_modules/
+**/dist/
+**/__pycache__/
+.venv/
+.runtime/
+.data/
+*.log
+.DS_Store

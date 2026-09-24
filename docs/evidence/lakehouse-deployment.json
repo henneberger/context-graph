@@ -1,0 +1,7 @@
+{
+  "job": "RUNNING",
+  "reconciliation": "DEPLOYED",
+  "image": "context-graph/processor:lakehouse-v3",
+  "warehouse": "Polaris / RustFS",
+  "checkpointDirectory": "s3://context-recovery/checkpoints"
+}

@@ -1,0 +1,9 @@
+{
+  "query->polaris": "allowed",
+  "query->object-storage": "allowed",
+  "query->spicedb-postgres": "blocked",
+  "ingestion->object-storage": "allowed",
+  "ingestion->polaris": "blocked",
+  "dashboard->object-storage": "blocked",
+  "dashboard->polaris": "blocked"
+}

@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["errorId","endpoint","occurredAt","message"],"properties":{"errorId":{"type":"string"},"endpoint":{"type":"string"},"occurredAt":{"type":"string","format":"date-time"},"message":{"type":"string"}},"additionalProperties":false}

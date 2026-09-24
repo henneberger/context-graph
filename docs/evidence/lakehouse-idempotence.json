@@ -1,0 +1,31 @@
+{
+  "passed": true,
+  "before": {
+    "object-storage-0": {
+      "uid": "9b2a48dd-331f-4c6f-8dcc-214115204fd7",
+      "restarts": 0
+    },
+    "polaris-b78746975-6ghkp": {
+      "uid": "4b11781c-ab3d-4c4d-bd43-eb98dccbe19b",
+      "restarts": 0
+    },
+    "polaris-b78746975-kqgfl": {
+      "uid": "6f26314c-1f29-4089-b67f-dda3b5a4c48b",
+      "restarts": 0
+    }
+  },
+  "after": {
+    "object-storage-0": {
+      "uid": "9b2a48dd-331f-4c6f-8dcc-214115204fd7",
+      "restarts": 0
+    },
+    "polaris-b78746975-6ghkp": {
+      "uid": "4b11781c-ab3d-4c4d-bd43-eb98dccbe19b",
+      "restarts": 0
+    },
+    "polaris-b78746975-kqgfl": {
+      "uid": "6f26314c-1f29-4089-b67f-dda3b5a4c48b",
+      "restarts": 0
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "status": {
+    "id": "COMPLETED"
+  },
+  "operation": {
+    "location": "s3://context-recovery/savepoints/savepoint-70239a-e94cd990355c"
+  }
+}

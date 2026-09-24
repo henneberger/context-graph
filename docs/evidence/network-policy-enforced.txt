@@ -1,0 +1,1 @@
+PASS NetworkPolicy actually blocks pod-to-pod traffic

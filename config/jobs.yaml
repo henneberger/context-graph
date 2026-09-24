@@ -1,0 +1,28 @@
+name: context-secure-v1
+parallelism: 2
+sourceTopics: [cg.secure.events, cg.secure.images, cg.secure.video]
+consumerGroup: context-secure-v1
+envelopeSchema: schemas/envelope.json
+errorTopic: cg.secure.errors
+checkpointIntervalMs: 10000
+checkpointMinPauseMs: 5000
+watermarkDelaySeconds: 3
+idleSeconds: 10
+namespace: context_secure
+outputs:
+  events: {table: events, schema: schemas/events.schema.json}
+  nodes: {table: nodes, topic: cg.secure.nodes, schema: schemas/nodes.schema.json}
+  edges: {table: edges, topic: cg.secure.edges, schema: schemas/edges.schema.json}
+  metrics: {table: metrics, topic: cg.secure.metrics, schema: schemas/metrics.schema.json}
+graph:
+  nodeTypePointer: /kind
+  targetPointer: /payload/relatedTo
+  relation: related_to
+aggregations:
+  - id: value-10s
+    valuePointer: /payload/value
+    metricPointer: /payload/metric
+    defaultMetric: value
+    windowSeconds: 10
+    scale: 1.0
+    offset: 0.0

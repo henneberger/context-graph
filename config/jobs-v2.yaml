@@ -1,0 +1,29 @@
+# Warm this independent job before switching queries/subscriptions. Set JOB_ID=context-secure-v2.
+name: context-secure-v2
+parallelism: 2
+sourceTopics: [cg.secure.events, cg.secure.images, cg.secure.video]
+consumerGroup: context-secure-v2
+envelopeSchema: schemas/envelope.json
+errorTopic: cg.secure.errors
+checkpointIntervalMs: 5000
+checkpointMinPauseMs: 1000
+watermarkDelaySeconds: 3
+idleSeconds: 10
+namespace: context_secure
+outputs:
+  events: {table: events_v2, schema: schemas/events.schema.json}
+  nodes: {table: nodes_v2, topic: cg.secure.nodes.v2, schema: schemas/nodes.schema.json}
+  edges: {table: edges_v2, topic: cg.secure.edges.v2, schema: schemas/edges.schema.json}
+  metrics: {table: metrics_v2, topic: cg.secure.metrics.v2, schema: schemas/metrics.schema.json}
+graph:
+  nodeTypePointer: /kind
+  targetPointer: /payload/relatedTo
+  relation: related_to
+aggregations:
+  - id: value-5s
+    valuePointer: /payload/value
+    metricPointer: /payload/metric
+    defaultMetric: value
+    windowSeconds: 5
+    scale: 1.0
+    offset: 0.0

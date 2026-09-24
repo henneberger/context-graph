@@ -1,0 +1,20 @@
+{
+  "ingestionExit": 0,
+  "rollout": {
+    "restartExit": 0,
+    "ingestionReady": true,
+    "queryReady": true,
+    "readyAfterSeconds": 27.451
+  },
+  "querySamples": 102,
+  "queryFailures": [
+    {
+      "elapsedSeconds": 29.26,
+      "error": "HTTP Error 502: Bad Gateway"
+    }
+  ],
+  "queryMeanMs": 369.76,
+  "queryP95Ms": 858.52,
+  "queryMaxMs": 2669.72,
+  "elapsedSeconds": 90.57
+}

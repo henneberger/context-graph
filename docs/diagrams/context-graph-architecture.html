@@ -1,0 +1,297 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Context Graph · Architecture</title><style>
+*{box-sizing:border-box}body{margin:0;background:#e8edf3;font:14px system-ui,sans-serif;color:#183047}header{height:70px;padding:0 25px;display:flex;align-items:center;gap:14px;background:#fff;border-bottom:1px solid #d5dfea}header b{font-size:17px}header span{color:#60738a;margin-right:auto}button{border:1px solid #ccd7e3;border-radius:8px;background:white;color:#24475a;padding:9px 13px;cursor:pointer}button:hover{background:#eef5fa}#viewport{height:calc(100vh - 70px);overflow:auto;padding:22px;cursor:grab}#viewport.dragging{cursor:grabbing;user-select:none}#diagram{margin:auto;width:2400px;box-shadow:0 12px 45px #203a5918}svg{display:block;width:100%;height:auto}#zoom{min-width:45px;text-align:center;font-variant-numeric:tabular-nums}@media(max-width:720px){header{padding:0 10px;gap:7px}header span{display:none}header b{margin-right:auto;font-size:13px}button{padding:8px}}@media print{header{display:none}#viewport{height:auto;padding:0;overflow:visible}#diagram{width:100%!important;box-shadow:none}body{background:#fff}}
+</style><header><b>Context / Architecture</b><span>Pan, zoom and inspect the complete system</span><button id="minus" aria-label="Zoom out">−</button><output id="zoom"></output><button id="plus" aria-label="Zoom in">+</button><button id="fit">Fit</button><button id="download">Save SVG</button></header><main id="viewport"><div id="diagram"><svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1920" viewBox="0 0 2400 1920" role="img" aria-labelledby="title desc">
+<title id="title">Context Graph — complete system architecture</title>
+<desc id="desc">Local Kubernetes architecture: authenticated JSON, image and video ingestion through Vert.x; schema-validated Kafka; Flink graph and temporal processing; Iceberg and Kafka outputs; DuckDB GraphQL queries, Reactor Flux subscriptions, and a separate dashboard. OIDC and a check-only SpiceDB proxy enforce entity permissions. Separate media, recovery state, configuration and operator controls are shown. Matching lettered ports are explicit logical connections.</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#203a59" flood-opacity="0.06"/></filter>
+<marker id="arrow-b34e38" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#b34e38" stroke-width="1.7"/></marker>
+<marker id="start-b34e38" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#b34e38" stroke-width="1.7"/></marker>
+<marker id="arrow-58738f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#58738f" stroke-width="1.7"/></marker>
+<marker id="start-58738f" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#58738f" stroke-width="1.7"/></marker>
+<marker id="arrow-346ac5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#346ac5" stroke-width="1.7"/></marker>
+<marker id="start-346ac5" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#346ac5" stroke-width="1.7"/></marker>
+<marker id="arrow-7050c8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#7050c8" stroke-width="1.7"/></marker>
+<marker id="start-7050c8" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#7050c8" stroke-width="1.7"/></marker>
+<marker id="arrow-087f8c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#087f8c" stroke-width="1.7"/></marker>
+<marker id="start-087f8c" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#087f8c" stroke-width="1.7"/></marker>
+<marker id="arrow-52677f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#52677f" stroke-width="1.7"/></marker>
+<marker id="start-52677f" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#52677f" stroke-width="1.7"/></marker>
+<marker id="arrow-a76609" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#a76609" stroke-width="1.7"/></marker>
+<marker id="start-a76609" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M9 1 L1 5 L9 9" fill="none" stroke="#a76609" stroke-width="1.7"/></marker>
+</defs><g font-family="Inter, Arial, sans-serif">
+<rect x="0" y="0" width="2400" height="1920" rx="0" fill="#f4f7fb" stroke="none" />
+<rect x="60" y="50" width="10" height="76" rx="4" fill="#087f8c" stroke="none" />
+<text x="92" y="78" font-size="15" fill="#527089" font-weight="750" letter-spacing="2.5">CONTEXT / SYSTEM ARCHITECTURE</text>
+<text x="92" y="123" font-size="43" fill="#122438" font-weight="750" >A secure, live context graph</text>
+<text x="92" y="158" font-size="21" fill="#142337" font-weight="400" >From arbitrary JSON and streamed media to temporal metrics, connected entities, and authorized experiences.</text>
+<rect x="1920" y="60" width="360" height="27" rx="8" fill="#e5eefc" stroke="none" />
+<text x="1932" y="79" font-size="13" fill="#346ac5" font-weight="700" >LOCAL KUBERNETES</text>
+<text x="1920" y="113" font-size="20" fill="#445773" font-weight="600" >Namespace: context-graph</text>
+<text x="1920" y="145" font-size="16" fill="#69778b" font-weight="400" >Implementation overview · 24 Sep 2026</text>
+<rect x="60" y="190" width="2220" height="340" rx="24" fill="#fff5ef" stroke="#eedacb" />
+<text x="84" y="222" font-size="15" fill="#b34e38" font-weight="750" letter-spacing="1.5">01 / IDENTITY &amp; AUTHORIZATION</text>
+<text x="790" y="222" font-size="19" fill="#814d3f" font-weight="600" >Workspace-wide reads • restricted entities need grants • writes require writer/admin</text>
+<rect x="85" y="245" width="435" height="260" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="85" y="245" width="5" height="260" rx="2" fill="#b34e38" stroke="none" />
+<text x="110" y="284" font-size="27" fill="#b34e38" font-weight="750" >OIDC identity</text>
+<text x="110" y="313" font-size="15" fill="#69778b" font-weight="500" >Local development issuer · 2 replicas</text>
+<rect x="462" y="265" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="474" y="284" font-size="13" fill="#34495f" font-weight="700" >A</text>
+<path d="M110 331 H495" stroke="#e6ebf2"/>
+<text x="110" y="359" font-size="17" fill="#536174" font-weight="400" >RS256 JWT + HTTPS JWKS</text>
+<text x="110" y="388" font-size="17" fill="#536174" font-weight="400" >APIs verify issuer, audience, subject, expiry</text>
+<text x="110" y="417" font-size="17" fill="#536174" font-weight="400" >Development sign-in → 5-minute token</text>
+<text x="110" y="458" font-size="16" fill="#8b5b4c" font-weight="600" >Production: managed OIDC + browser PKCE¹</text>
+<rect x="605" y="245" width="435" height="260" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="605" y="245" width="5" height="260" rx="2" fill="#b34e38" stroke="none" />
+<text x="630" y="284" font-size="27" fill="#b34e38" font-weight="750" >Permission-check proxy</text>
+<text x="630" y="313" font-size="15" fill="#69778b" font-weight="500" >HTTPS · 2 replicas · separate API credential</text>
+<rect x="982" y="265" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="994" y="284" font-size="13" fill="#34495f" font-weight="700" >B</text>
+<path d="M630 331 H1015" stroke="#e6ebf2"/>
+<text x="630" y="359" font-size="18" fill="#536174" font-weight="400" >Only POST /v1/permissions/check</text>
+<text x="630" y="389" font-size="18" fill="#536174" font-weight="400" >Forces fully consistent SpiceDB checks</text>
+<text x="630" y="419" font-size="18" fill="#536174" font-weight="400" >No policy writes with API credentials</text>
+<text x="630" y="458" font-size="17" fill="#b34e38" font-weight="600" >Both Vert.x APIs connect through B</text>
+<rect x="1140" y="245" width="485" height="260" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1140" y="245" width="5" height="260" rx="2" fill="#b34e38" stroke="none" />
+<text x="1165" y="284" font-size="27" fill="#b34e38" font-weight="750" >SpiceDB</text>
+<text x="1165" y="313" font-size="15" fill="#69778b" font-weight="500" >v1.56.2 · 2 replicas</text>
+<path d="M1165 331 H1600" stroke="#e6ebf2"/>
+<text x="1165" y="359" font-size="18" fill="#536174" font-weight="400" >Workspace membership + entity relations</text>
+<text x="1165" y="389" font-size="18" fill="#536174" font-weight="400" >view / ingest / manage permissions</text>
+<text x="1165" y="419" font-size="18" fill="#536174" font-weight="400" >No positive permission cache; fail closed</text>
+<text x="1165" y="458" font-size="17" fill="#b34e38" font-weight="600" >Restrict, grant and revoke through operator only</text>
+<rect x="1730" y="245" width="520" height="145" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1730" y="245" width="5" height="145" rx="2" fill="#b34e38" stroke="none" />
+<text x="1755" y="284" font-size="27" fill="#b34e38" font-weight="750" >PostgreSQL</text>
+<text x="1755" y="313" font-size="15" fill="#69778b" font-weight="500" >Separate SpiceDB and Polaris databases</text>
+<rect x="2192" y="265" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="2204" y="284" font-size="13" fill="#34495f" font-weight="700" >P</text>
+<path d="M1755 331 H2225" stroke="#e6ebf2"/>
+<text x="1755" y="361" font-size="18" fill="#142337" font-weight="400" >Verified TLS connection · single instance¹</text>
+<rect x="1730" y="414" width="520" height="91" rx="16" fill="#fff" stroke="#eedacb" />
+<text x="1755" y="447" font-size="23" fill="#b34e38" font-weight="700" >Trusted operator tooling</text>
+<text x="1755" y="478" font-size="17" fill="#142337" font-weight="400" >permissions.py • schema + grants • admin credential</text>
+<path d="M1040 355 H1140" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1040 355 H1140" fill="none" stroke="#b34e38" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-b34e38)" stroke-dasharray="7 7"/>
+<path d="M1625 322 H1730" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1625 322 H1730" fill="none" stroke="#b34e38" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-b34e38)" stroke-dasharray="7 7"/>
+<path d="M1730 460 H1625" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1730 460 H1625" fill="none" stroke="#b34e38" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-b34e38)" stroke-dasharray="7 7"/>
+<text x="60" y="575" font-size="15" fill="#087f8c" font-weight="750" letter-spacing="1.5">02 / INGEST, PROCESS &amp; PERSIST</text>
+<text x="925" y="575" font-size="18" fill="#536174" font-weight="400" >API, auth, Kafka, Polaris and S3 use verified TLS; identities and network policies limit access.</text>
+<rect x="60" y="610" width="280" height="390" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="60" y="610" width="5" height="390" rx="2" fill="#52677f" stroke="none" />
+<text x="85" y="649" font-size="27" fill="#52677f" font-weight="750" >Producers</text>
+<text x="85" y="678" font-size="15" fill="#69778b" font-weight="500" >Clients + load generators</text>
+<rect x="282" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="294" y="649" font-size="13" fill="#34495f" font-weight="700" >A</text>
+<path d="M85 696 H315" stroke="#e6ebf2"/>
+<text x="85" y="728" font-size="23" fill="#243b53" font-weight="600" >Unstructured JSON</text>
+<text x="85" y="770" font-size="23" fill="#243b53" font-weight="600" >PNG / JPEG images</text>
+<text x="85" y="812" font-size="23" fill="#243b53" font-weight="600" >Streamed video</text>
+<text x="85" y="884" font-size="17" fill="#536174" font-weight="400" >Rate + concurrency controls</text>
+<text x="85" y="913" font-size="17" fill="#536174" font-weight="400" >Schema drift / time disorder</text>
+<text x="85" y="942" font-size="17" fill="#536174" font-weight="400" >GOP and streaming controls</text>
+<rect x="390" y="610" width="360" height="390" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="390" y="610" width="5" height="390" rx="2" fill="#087f8c" stroke="none" />
+<text x="415" y="649" font-size="27" fill="#087f8c" font-weight="750" >Vert.x ingestion</text>
+<text x="415" y="678" font-size="15" fill="#69778b" font-weight="500" >v5.2 · 2 replicas · endpoint/topic config</text>
+<rect x="692" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="704" y="649" font-size="13" fill="#34495f" font-weight="700" >C</text>
+<rect x="658" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="670" y="649" font-size="13" fill="#34495f" font-weight="700" >B</text>
+<rect x="624" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="636" y="649" font-size="13" fill="#34495f" font-weight="700" >A</text>
+<path d="M415 696 H725" stroke="#e6ebf2"/>
+<text x="415" y="724" font-size="17" fill="#536174" font-weight="400" >JWT + workspace + ingest grant</text>
+<text x="415" y="753" font-size="17" fill="#536174" font-weight="400" >Validate input and output JSON Schema</text>
+<text x="415" y="782" font-size="17" fill="#536174" font-weight="400" >Derive canonical security labels</text>
+<rect x="413" y="814" width="313" height="100" rx="12" fill="#edf8f8" stroke="none" />
+<text x="430" y="842" font-size="18" fill="#087f8c" font-weight="700" >Media processing</text>
+<text x="430" y="869" font-size="16" fill="#536174" font-weight="400" >Image dimensions, hashes, metadata</text>
+<text x="430" y="894" font-size="16" fill="#536174" font-weight="400" >FFmpeg → ~2s keyframe HLS chunks</text>
+<text x="415" y="953" font-size="16" fill="#087f8c" font-weight="600" >Acknowledge only after Kafka publish</text>
+<rect x="416" y="965" width="231" height="27" rx="8" fill="#e0f2f2" stroke="none" />
+<text x="428" y="984" font-size="13" fill="#087f8c" font-weight="700" >M  /media permission gate</text>
+<rect x="656" y="965" width="45" height="27" rx="8" fill="#fff4df" stroke="none" />
+<text x="668" y="984" font-size="13" fill="#a76609" font-weight="700" >E</text>
+<rect x="800" y="610" width="390" height="390" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="800" y="610" width="5" height="390" rx="2" fill="#a76609" stroke="none" />
+<text x="825" y="649" font-size="27" fill="#a76609" font-weight="750" >Kafka</text>
+<text x="825" y="678" font-size="15" fill="#69778b" font-weight="500" >4.1.1 · 3 brokers · replication 3 / min ISR 2</text>
+<path d="M825 696 H1165" stroke="#e6ebf2"/>
+<text x="825" y="724" font-size="14" fill="#a76609" font-weight="750" letter-spacing="1">ENDPOINT TOPICS</text>
+<text x="825" y="754" font-size="21" fill="#433721" font-weight="600" >cg.secure.events</text>
+<text x="825" y="784" font-size="21" fill="#433721" font-weight="600" >cg.secure.images</text>
+<text x="825" y="814" font-size="21" fill="#433721" font-weight="600" >cg.secure.video</text>
+<text x="825" y="863" font-size="13" fill="#7a6952" font-weight="700" >VALIDATED JSON + MEDIA REFERENCES</text>
+<path d="M825 882 H1165" stroke="#eadfc9"/>
+<text x="825" y="909" font-size="14" fill="#a76609" font-weight="750" letter-spacing="1">PROCESSED LIVE TOPICS</text>
+<text x="825" y="941" font-size="18" fill="#433721" font-weight="600" >cg.secure.metrics / nodes / edges</text>
+<text x="825" y="974" font-size="16" fill="#7a6952" font-weight="400" >Input video topic also feeds subscriptions ↓</text>
+<rect x="1240" y="610" width="470" height="390" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1240" y="610" width="5" height="390" rx="2" fill="#7050c8" stroke="none" />
+<text x="1265" y="649" font-size="27" fill="#7050c8" font-weight="750" >Flink stream processing</text>
+<text x="1265" y="678" font-size="15" fill="#69778b" font-weight="500" >2.3 · Kafka connector + Iceberg sinks</text>
+<rect x="1652" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1664" y="649" font-size="13" fill="#34495f" font-weight="700" >R</text>
+<rect x="1618" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1630" y="649" font-size="13" fill="#34495f" font-weight="700" >C</text>
+<path d="M1265 696 H1685" stroke="#e6ebf2"/>
+<text x="1265" y="725" font-size="18" fill="#536174" font-weight="400" >Revalidate schemas + canonical resource IDs</text>
+<text x="1265" y="757" font-size="18" fill="#536174" font-weight="400" >JSON Pointer projections and graph extraction</text>
+<text x="1265" y="789" font-size="18" fill="#536174" font-weight="400" >Event-time temporal aggregates + watermarks</text>
+<rect x="1263" y="826" width="423" height="87" rx="12" fill="#f1edfb" stroke="none" />
+<text x="1280" y="855" font-size="18" fill="#7050c8" font-weight="700" >Security scope survives every transform</text>
+<text x="1280" y="884" font-size="17" fill="#142337" font-weight="400" >Keys: workspace + resource + metric / window</text>
+<text x="1265" y="946" font-size="16" fill="#536174" font-weight="400" >2 JobManagers (active / standby) • 1 TaskManager</text>
+<text x="1265" y="971" font-size="16" fill="#536174" font-weight="400" >Parallelism 2 · isolated candidate jobs supported</text>
+<rect x="1660" y="962" width="29" height="27" rx="8" fill="#fff4df" stroke="none" />
+<text x="1672" y="981" font-size="13" fill="#a76609" font-weight="700" >E</text>
+<rect x="1760" y="610" width="520" height="390" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1760" y="610" width="5" height="390" rx="2" fill="#346ac5" stroke="none" />
+<text x="1785" y="649" font-size="27" fill="#346ac5" font-weight="750" >Polaris + Iceberg</text>
+<text x="1785" y="678" font-size="15" fill="#69778b" font-weight="500" >Polaris 1.7 · Iceberg 1.11 · RustFS object storage</text>
+<rect x="2222" y="630" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="2234" y="649" font-size="13" fill="#34495f" font-weight="700" >P</text>
+<path d="M1785 696 H2255" stroke="#e6ebf2"/>
+<text x="1785" y="726" font-size="24" fill="#346ac5" font-weight="650" >Private catalog + warehouse</text>
+<text x="1785" y="770" font-size="17" fill="#536174" font-weight="400" >Polaris REST · 2 replicas · persistent catalog P</text>
+<text x="1785" y="803" font-size="17" fill="#536174" font-weight="400" >RustFS S3 + STS · context-warehouse bucket</text>
+<text x="1785" y="836" font-size="17" fill="#536174" font-weight="400" >events / nodes / edges / metrics; labeled rows</text>
+<text x="1785" y="869" font-size="17" fill="#536174" font-weight="400" >Reader and writer identities are separate</text>
+<text x="1785" y="902" font-size="17" fill="#536174" font-weight="400" >Vended, temporary table-scoped credentials</text>
+<text x="1785" y="943" font-size="18" fill="#346ac5" font-weight="650" >Flink commits · governed API reads</text>
+<text x="1785" y="974" font-size="16" fill="#69778b" font-weight="400" >Private backends; no direct user credentials</text>
+<path d="M340 794 H390" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M340 794 H390" fill="none" stroke="#52677f" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-52677f)"/>
+<path d="M750 770 H800" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M750 770 H800" fill="none" stroke="#087f8c" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-087f8c)"/>
+<path d="M1190 770 H1240" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1190 770 H1240" fill="none" stroke="#a76609" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-a76609)"/>
+<path d="M1240 938 H1190" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1240 938 H1190" fill="none" stroke="#7050c8" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-7050c8)"/>
+<path d="M1710 770 H1760" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1710 770 H1760" fill="none" stroke="#7050c8" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-7050c8)"/>
+<text x="1260" y="1041" font-size="17" fill="#6b5e8c" font-weight="400" >Checkpoint-aligned sinks; Kafka may lead committed Iceberg history.</text>
+<text x="60" y="1080" font-size="15" fill="#087f8c" font-weight="750" letter-spacing="1.5">03 / AUTHORIZED ACCESS</text>
+<rect x="60" y="1110" width="280" height="320" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="60" y="1110" width="5" height="320" rx="2" fill="#a76609" stroke="none" />
+<text x="85" y="1149" font-size="27" fill="#a76609" font-weight="750" >Error queue</text>
+<text x="85" y="1178" font-size="15" fill="#69778b" font-weight="500" >Operational / admin only</text>
+<rect x="282" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="294" y="1149" font-size="13" fill="#34495f" font-weight="700" >E</text>
+<path d="M85 1196 H315" stroke="#e6ebf2"/>
+<text x="85" y="1225" font-size="21" fill="#a76609" font-weight="650" >cg.secure.errors</text>
+<text x="85" y="1264" font-size="17" fill="#536174" font-weight="400" >Schema / processing errors</text>
+<text x="85" y="1293" font-size="17" fill="#536174" font-weight="400" >Malformed / late records</text>
+<text x="85" y="1322" font-size="17" fill="#536174" font-weight="400" >Writers: ingestion + Flink</text>
+<text x="85" y="1351" font-size="17" fill="#536174" font-weight="400" >No GraphQL read access</text>
+<text x="85" y="1400" font-size="16" fill="#7a6952" font-weight="400" >Authorized failures only</text>
+<rect x="390" y="1110" width="360" height="320" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="390" y="1110" width="5" height="320" rx="2" fill="#087f8c" stroke="none" />
+<text x="415" y="1149" font-size="27" fill="#087f8c" font-weight="750" >Protected media store</text>
+<text x="415" y="1178" font-size="15" fill="#69778b" font-weight="500" >RustFS context-media bucket + security sidecars</text>
+<path d="M415 1196 H725" stroke="#e6ebf2"/>
+<text x="415" y="1226" font-size="18" fill="#536174" font-weight="400" >Images, playlists and .ts chunks</text>
+<text x="415" y="1257" font-size="18" fill="#536174" font-weight="400" >File → workspace + entity binding</text>
+<text x="415" y="1288" font-size="18" fill="#536174" font-weight="400" >Only ingestion holds media keys</text>
+<rect x="413" y="1334" width="313" height="72" rx="12" fill="#edf8f8" stroke="none" />
+<text x="430" y="1362" font-size="17" fill="#087f8c" font-weight="600" >Media bytes never enter Kafka,</text>
+<text x="430" y="1388" font-size="17" fill="#087f8c" font-weight="600" >Flink, Iceberg or DuckDB.</text>
+<path d="M570 1000 V1110" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M570 1000 V1110" fill="none" stroke="#087f8c" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-087f8c)" marker-start="url(#start-087f8c)"/>
+<text x="400" y="1051" font-size="16" fill="#087f8c" font-weight="400" >Complete chunks + security metadata</text>
+<rect x="800" y="1110" width="910" height="320" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="800" y="1110" width="5" height="320" rx="2" fill="#087f8c" stroke="none" />
+<text x="825" y="1149" font-size="27" fill="#087f8c" font-weight="750" >Vert.x GraphQL API</text>
+<text x="825" y="1178" font-size="15" fill="#69778b" font-weight="500" >v5.2 · 2 replicas · only registered, labeled table schemas</text>
+<rect x="1652" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1664" y="1149" font-size="13" fill="#34495f" font-weight="700" >C</text>
+<rect x="1618" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1630" y="1149" font-size="13" fill="#34495f" font-weight="700" >B</text>
+<rect x="1584" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1596" y="1149" font-size="13" fill="#34495f" font-weight="700" >A</text>
+<path d="M825 1196 H1685" stroke="#e6ebf2"/>
+<rect x="824" y="1216" width="402" height="189" rx="12" fill="#f3f5fc" stroke="none" />
+<text x="843" y="1247" font-size="20" fill="#7050c8" font-weight="700" >LIVE / Kafka → Reactor Flux</text>
+<text x="843" y="1279" font-size="16" fill="#536174" font-weight="400" >Unique consumer group per API replica</text>
+<text x="843" y="1308" font-size="16" fill="#536174" font-weight="400" >read_committed • bounded per-client queues</text>
+<text x="843" y="1337" font-size="16" fill="#536174" font-weight="400" >Topic / entity routing + permission per event</text>
+<text x="843" y="1366" font-size="16" fill="#536174" font-weight="400" >Expiry, revocation, cancellation, reconnect</text>
+<rect x="1242" y="1216" width="444" height="189" rx="12" fill="#eef6fc" stroke="none" />
+<text x="1260" y="1247" font-size="20" fill="#346ac5" font-weight="700" >FEDERATED / DuckDB</text>
+<text x="1260" y="1279" font-size="16" fill="#536174" font-weight="400" >iceberg + cache_httpfs · Polaris schema discovery</text>
+<text x="1260" y="1308" font-size="16" fill="#536174" font-weight="400" >Authorize EACH source BEFORE joins / aggregates</text>
+<text x="1260" y="1337" font-size="16" fill="#536174" font-weight="400" >Credential-free joins; recheck contributors</text>
+<text x="1260" y="1366" font-size="16" fill="#536174" font-weight="400" >Edges require access to BOTH endpoints</text>
+<rect x="1760" y="1110" width="520" height="320" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1760" y="1110" width="5" height="320" rx="2" fill="#087f8c" stroke="none" />
+<text x="1785" y="1149" font-size="27" fill="#087f8c" font-weight="750" >Context dashboard</text>
+<text x="1785" y="1178" font-size="15" fill="#69778b" font-weight="500" >Separate service · browser UI + Nginx proxy</text>
+<rect x="2222" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="2234" y="1149" font-size="13" fill="#34495f" font-weight="700" >M</text>
+<rect x="2188" y="1130" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="2200" y="1149" font-size="13" fill="#34495f" font-weight="700" >A</text>
+<path d="M1785 1196 H2255" stroke="#e6ebf2"/>
+<text x="1785" y="1227" font-size="23" fill="#087f8c" font-weight="650" >Live metrics   /   graph   /   HLS video</text>
+<text x="1785" y="1267" font-size="18" fill="#536174" font-weight="400" >GraphQL HTTP + graphql-transport-ws</text>
+<text x="1785" y="1299" font-size="18" fill="#536174" font-weight="400" >Bearer token + workspace on queries / WS init</text>
+<text x="1785" y="1331" font-size="18" fill="#536174" font-weight="400" >/auth/session → Secure, HttpOnly media cookie</text>
+<text x="1785" y="1363" font-size="18" fill="#536174" font-weight="400" >/media → ingestion permission gate M</text>
+<text x="1785" y="1409" font-size="17" fill="#087f8c" font-weight="650" >No direct file access · no data volume mounted</text>
+<path d="M1000 1000 V1110" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1000 1000 V1110" fill="none" stroke="#a76609" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-a76609)"/>
+<text x="1020" y="1068" font-size="17" fill="#a76609" font-weight="400" >Live topics + video metadata</text>
+<path d="M2050 1000 V1060 H1500 V1110" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M2050 1000 V1060 H1500 V1110" fill="none" stroke="#346ac5" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-346ac5)"/>
+<text x="1900" y="1088" font-size="17" fill="#346ac5" font-weight="400" >Schemas + table-scoped credentials</text>
+<path d="M1710 1280 H1760" fill="none" stroke="#f4f7fb" stroke-width="9" stroke-linejoin="round"/>
+<path d="M1710 1280 H1760" fill="none" stroke="#087f8c" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-087f8c)"/>
+<rect x="60" y="1470" width="2220" height="64" rx="15" fill="#e8f0f4" stroke="none" />
+<text x="84" y="1510" font-size="15" fill="#087f8c" font-weight="750" >M  MEDIA PATH</text>
+<text x="250" y="1510" font-size="20" fill="#24475a" font-weight="600" >Browser / HLS.js ⇄ Nginx ⇄ ingestion authorization ⇄ RustFS media</text>
+<text x="1130" y="1510" font-size="17" fill="#436373" font-weight="400" >Every file, playlist and range request rechecks access; active transfers check revocation and expiry.</text>
+<text x="60" y="1582" font-size="15" fill="#52677f" font-weight="750" letter-spacing="1.5">04 / CONFIGURATION, RECOVERY &amp; OPERATIONS</text>
+<rect x="60" y="1605" width="640" height="191" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="60" y="1605" width="5" height="191" rx="2" fill="#52677f" stroke="none" />
+<text x="85" y="1644" font-size="27" fill="#52677f" font-weight="750" >JSON / YAML configuration</text>
+<text x="85" y="1673" font-size="15" fill="#69778b" font-weight="500" >Versioned, content-addressed ConfigMaps</text>
+<rect x="642" y="1625" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="654" y="1644" font-size="13" fill="#34495f" font-weight="700" >C</text>
+<path d="M85 1691 H675" stroke="#e6ebf2"/>
+<text x="85" y="1720" font-size="17" fill="#536174" font-weight="400" >ingestion.json + JSON Schemas → endpoint contracts</text>
+<text x="85" y="1748" font-size="17" fill="#536174" font-weight="400" >jobs.yaml → sources, transforms, windows, Kafka / Iceberg sinks</text>
+<text x="85" y="1776" font-size="17" fill="#536174" font-weight="400" >query.yaml + queries.yaml → schemas, SQL, GraphQL + routing</text>
+<rect x="745" y="1605" width="715" height="191" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="745" y="1605" width="5" height="191" rx="2" fill="#7050c8" stroke="none" />
+<text x="770" y="1644" font-size="27" fill="#7050c8" font-weight="750" >State &amp; Flink orchestration</text>
+<text x="770" y="1673" font-size="15" fill="#69778b" font-weight="500" >R  Operator 1.16.1 (2 replicas) ↔ FlinkDeployment / jobs</text>
+<rect x="1402" y="1625" width="27" height="27" rx="8" fill="#edf2f8" stroke="none" />
+<text x="1414" y="1644" font-size="13" fill="#34495f" font-weight="700" >R</text>
+<path d="M770 1691 H1435" stroke="#e6ebf2"/>
+<text x="770" y="1720" font-size="17" fill="#536174" font-weight="400" >Incremental RocksDB checkpoints · 10s interval / 5s min pause</text>
+<text x="770" y="1748" font-size="17" fill="#536174" font-weight="400" >Retained checkpoints + upgrade / hourly savepoints + HA metadata</text>
+<text x="770" y="1776" font-size="17" fill="#536174" font-weight="400" >RustFS recovery bucket · native savepoints · Kafka buffers input</text>
+<rect x="1505" y="1605" width="775" height="191" rx="20" fill="#fff" stroke="#dbe3ed" filter="url(#shadow)"/>
+<rect x="1505" y="1605" width="5" height="191" rx="2" fill="#52677f" stroke="none" />
+<text x="1530" y="1644" font-size="27" fill="#52677f" font-weight="750" >Deployment &amp; network controls</text>
+<text x="1530" y="1673" font-size="15" fill="#69778b" font-weight="500" >Kubernetes Secrets, service identities and enforced NetworkPolicies</text>
+<path d="M1530 1691 H2255" stroke="#e6ebf2"/>
+<text x="1530" y="1720" font-size="17" fill="#536174" font-weight="400" >Firewall-only kube-router · API → check proxy; direct SpiceDB / PG blocked</text>
+<text x="1530" y="1748" font-size="17" fill="#536174" font-weight="400" >Rolling replicas + PDBs + readiness + request drain; schema/ACL provisioning</text>
+<text x="1530" y="1776" font-size="17" fill="#536174" font-weight="400" >Candidate Flink jobs: isolate state, groups, transactions, topics and tables</text>
+<text x="60" y="1834" font-size="13" fill="#536174" font-weight="750" letter-spacing="1">CONNECTOR KEY</text>
+<text x="215" y="1834" font-size="16" fill="#536174" font-weight="400" >Solid → data / media     Dashed → control / authorization     Matching A / B / C / E / M / P / R ports are explicit connections, repeated to keep routes readable.</text>
+<text x="60" y="1875" font-size="14" fill="#b34e38" font-weight="750" >¹ LOCAL PROFILE LIMITS</text>
+<text x="290" y="1875" font-size="16" fill="#705b54" font-weight="400" >Single-node RustFS and single PostgreSQL are not HA. Savepoint upgrades pause job output. Production needs HA storage/DB, HTTPS ingress and OIDC PKCE.</text>
+</g></svg></div></main><script>
+const viewport=document.getElementById('viewport'),diagram=document.getElementById('diagram');let scale=1;
+function setScale(value){scale=Math.max(.2,Math.min(2.5,value));diagram.style.width=(2400*scale)+'px';document.getElementById('zoom').textContent=Math.round(scale*100)+'%';}
+function fit(){setScale(Math.min((viewport.clientWidth-44)/2400,(viewport.clientHeight-44)/1920));viewport.scrollTo(0,0);}
+document.getElementById('plus').onclick=()=>setScale(scale*1.2);document.getElementById('minus').onclick=()=>setScale(scale/1.2);document.getElementById('fit').onclick=fit;
+document.getElementById('download').onclick=()=>{const blob=new Blob([new XMLSerializer().serializeToString(diagram.querySelector('svg'))],{type:'image/svg+xml'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='context-graph-architecture.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+let drag;viewport.addEventListener('pointerdown',e=>{if(e.button!==0)return;drag={x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};viewport.classList.add('dragging');viewport.setPointerCapture(e.pointerId);});viewport.addEventListener('pointermove',e=>{if(drag){viewport.scrollLeft=drag.left-e.clientX+drag.x;viewport.scrollTop=drag.top-e.clientY+drag.y;}});function end(){drag=null;viewport.classList.remove('dragging');}viewport.addEventListener('pointerup',end);viewport.addEventListener('pointercancel',end);viewport.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();setScale(scale*(e.deltaY<0?1.1:.9));}},{passive:false});window.addEventListener('resize',fit);fit();
+</script></html>

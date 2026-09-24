@@ -1,0 +1,9 @@
+{
+  "submitted": 900,
+  "succeeded": 900,
+  "failed": 0,
+  "elapsed_seconds": 90.001,
+  "requests_per_second": 10.0,
+  "mean_latency_seconds": 0.111,
+  "errors": []
+}

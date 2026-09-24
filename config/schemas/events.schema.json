@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "event_id",
+    "entity_id",
+    "endpoint",
+    "kind",
+    "event_time",
+    "ingested_at",
+    "payload",
+    "workspace_id",
+    "resource_id"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "endpoint": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "event_time": {
+      "type": "string"
+    },
+    "ingested_at": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "string"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "resource_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

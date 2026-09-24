@@ -1,0 +1,12 @@
+{
+  "exitCodes": {
+    "json": 0,
+    "images": 0,
+    "video": 0
+  },
+  "querySamples": 17,
+  "queryFailures": [],
+  "queryMeanMs": 716.59,
+  "queryP95Ms": 1119.08,
+  "queryMaxMs": 1119.08
+}

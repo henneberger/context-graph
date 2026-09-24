@@ -1,0 +1,7 @@
+{
+  "queryFailsClosedOnAuthorizationOutage": true,
+  "ingestionFailsClosedOnAuthorizationOutage": true,
+  "mediaFailsClosedOnAuthorizationOutage": true,
+  "mediaRecoveredAfterAuthorizationRestore": true,
+  "status": "passed"
+}

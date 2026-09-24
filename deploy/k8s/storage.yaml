@@ -1,0 +1,21 @@
+# Shared single-node development storage. Every pod uses the same absolute paths.
+# For multiple nodes replace this PV with durable shared POSIX storage (RWX).
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: context-graph-data
+spec:
+  capacity: {storage: 20Gi}
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: context-local
+  hostPath: {path: /var/lib/context-graph, type: DirectoryOrCreate}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: context-data, namespace: context-graph}
+spec:
+  accessModes: [ReadWriteMany]
+  resources: {requests: {storage: 20Gi}}
+  storageClassName: context-local
+  volumeName: context-graph-data

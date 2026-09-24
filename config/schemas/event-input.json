@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "entityId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "eventTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metric": {
+      "type": "string"
+    },
+    "value": {
+      "type": "number"
+    },
+    "relatedTo": {
+      "type": "string"
+    },
+    "security": false,
+    "schemaVersion": false
+  },
+  "additionalProperties": true,
+  "required": [
+    "entityId"
+  ]
+}

@@ -1,0 +1,13 @@
+# Enforced network boundaries
+
+`scripts/deploy.sh` runs a real pod-to-pod deny test before deploying. On clusters without enforcement, it installs `deploy/kube-router-firewall.yaml` and repeats the test; a failed second test stops deployment. The pinned kube-router v2.11.1 controller enables only its NetworkPolicy firewall. Routing, service proxy, and CNI installation are disabled. It does not mount or modify host CNI configuration. The host-network controller requires privileged iptables/ipset access; its Kubernetes RBAC is read-only list/watch/get for network objects. The existing CNI and kube-proxy continue providing connectivity.
+
+The manifests derive from the [official firewall example](https://github.com/cloudnativelabs/kube-router/blob/v2.11.1/daemonset/kube-router-firewall-daemonset.yaml), with installation and routing removed according to the [selective controller flags](https://www.kube-router.io/docs/user-guide/). The controller runs in kube-system; the application policies select only context-graph pods.
+
+The namespace defaults to deny. APIs can reach Kafka, identity, and the check-only SpiceDB proxy. Only that proxy and explicit provisioning pods can reach the SpiceDB API. Postgres accepts SpiceDB and migration pods. Flink and its operator receive only their required internal/control-plane connections. API server egress uses the actual service and endpoint IPs discovered at deploy time. Privileged cluster administrators, host processes, and Kubernetes port forwarding remain administrative capabilities, outside pod NetworkPolicy isolation.
+
+Run `python3 scripts/check-network-policy.py --context docker-desktop` to prove general isolation, then `python3 scripts/check-service-boundaries.py --context docker-desktop` to prove the deployed API boundaries. Both create and delete dedicated test pods and print no credentials. The latter proves the query role can reach the check proxy, identity and Kafka while direct SpiceDB and Postgres connections fail.
+
+Docker Desktop initially failed the deny test. After the firewall-only controller was installed, the deny test and all five service-boundary checks passed. Application replicas remained ready and Flink continued completing checkpoints. The controller supplements the existing CNI; it is not a replacement cluster installation.
+
+For removal, first remove the application NetworkPolicies and allow a firewall sync to remove their rules; only then delete `deploy/kube-router-firewall.yaml`. Removing the controller while retaining application workloads without another NetworkPolicy provider removes a required security boundary. Do not use that sequence as a production deployment mode.

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "entity_id",
+    "metric",
+    "window_start",
+    "window_end",
+    "sample_count",
+    "sum_value",
+    "avg_value",
+    "min_value",
+    "max_value",
+    "workspace_id",
+    "resource_id"
+  ],
+  "properties": {
+    "entity_id": {
+      "type": "string"
+    },
+    "metric": {
+      "type": "string"
+    },
+    "window_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "window_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sum_value": {
+      "type": "number"
+    },
+    "avg_value": {
+      "type": "number"
+    },
+    "min_value": {
+      "type": "number"
+    },
+    "max_value": {
+      "type": "number"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "resource_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

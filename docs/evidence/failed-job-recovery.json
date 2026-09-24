@@ -1,0 +1,34 @@
+{
+  "jobId": "7a3e21e86a7399b6bd5003d50df00d16",
+  "state": "RUNNING",
+  "restored": {
+    "id": 493,
+    "restore_timestamp": 1790284158759,
+    "is_savepoint": true,
+    "external_path": "s3://context-recovery/savepoints/savepoint-2ef559-530fa95a7215"
+  },
+  "completed": {
+    "className": "completed",
+    "id": 515,
+    "status": "COMPLETED",
+    "is_savepoint": false,
+    "savepointFormat": null,
+    "trigger_timestamp": 1790284380550,
+    "latest_ack_timestamp": 1790284380814,
+    "checkpointed_size": 64353,
+    "state_size": 82730,
+    "end_to_end_duration": 264,
+    "alignment_buffered": 0,
+    "processed_data": 592,
+    "persisted_data": 0,
+    "num_subtasks": 10,
+    "num_acknowledged_subtasks": 10,
+    "checkpoint_type": "CHECKPOINT",
+    "tasks": {},
+    "external_path": "s3://context-recovery/checkpoints/7a3e21e86a7399b6bd5003d50df00d16/chk-515",
+    "discarded": false
+  },
+  "eventRows": 3879,
+  "uniqueEventIds": 3879,
+  "duplicateEventIds": 0
+}
