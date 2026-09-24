@@ -14,6 +14,12 @@ Application builders define what their entities mean, how their data connects, w
 
 [![Context Graph platform architecture](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
 
+## SQL-backed architecture direction
+
+The next architecture uses **SQL-defined processing and views with derived GraphQL queries, mutations, and subscriptions**. Temporal computations belong in Flink SQL. Mutations publish validated Kafka commands/events and report processing status. Multiple Flink jobs run on ordinary Kubernetes resources, without the Flink Kubernetes operator.
+
+The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. **This is the target design; the current runtime still uses the legacy job configuration and operator deployment described below.**
+
 ## What the platform is for
 
 Useful context connects an observation to the things it concerns, the relationships around those things, when it happened, where it came from, and who can use it. Applications need different views of that shared context: an operator may need recent measurements and video for an asset; an investigator may need related events and their evidence; an assistant may need authorized source material for an answer.
@@ -266,42 +272,15 @@ The API supplies event identity, ingestion time, and trusted `security` labels. 
 
 Images and video use raw upload endpoints and `X-Entity-Id`. Their bytes are stored privately; metadata and references enter Kafka. See [ingestion contracts](services/ingestion/README.md) for formats, limits, responses, and error behavior.
 
-### 3. Define projections and temporal processing
+### 3. Define SQL processing and temporal views
 
-[config/jobs.yaml](config/jobs.yaml) selects source topics, output tables/topics, graph pointers, windows, and recovery settings. For the observation above, a domain-specific projection can use:
+The replacement authoring model is Flink SQL: projections, joins, and event-time windows produce registered views, with SQL result schemas feeding the application contract. Related sink INSERTs execute in a StatementSet; independent jobs have separate lifecycle and recovery identities. See the [SQL processing design](docs/design/sql-platform.md#flink-sql-replaces-the-fixed-aggregation-configuration) for a concrete windowed view and its Kafka/Iceberg outputs.
 
-```yaml
-graph:
-  nodeTypePointer: /payload/entityType
-  targetPointer: /payload/relatedTo
-  relation: located_at
-
-aggregations:
-  - id: temperature-10s
-    valuePointer: /payload/value
-    metricPointer: /payload/metric
-    defaultMetric: temperature
-    windowSeconds: 10
-    scale: 1.0
-    offset: 0.0
-```
-
-This projects `asset-42` as an `asset`, emits an edge to `site-7`, and computes ten-second metrics. It does not create the target site's node automatically. The checked-in generic job instead uses `/kind` and the relation `related_to`; change those settings deliberately for a domain.
-
-Aggregations are keyed by workspace, resource, entity, and metric, preserving access boundaries. Watermarks account for out-of-order events and idle Kafka partitions. A fully idle input does not necessarily close its last window merely because wall-clock time passes.
-
-The default durable projections are:
-
-| Iceberg table | Content |
-|---|---|
-| `events` | Observations, source payloads, event and ingestion times |
-| `nodes` | Entity projection versions, type, properties, source-event reference |
-| `edges` | Directed relationship versions, both endpoint IDs/scopes, source-event reference |
-| `metrics` | Resource-scoped window bounds, count, sum, average, minimum, maximum |
-
-All carry workspace/resource labels; edges additionally carry target-resource labels. The graph is queried relationally over these tables. Add processor logic and registered tables for richer domain semantics. Multiple versioned jobs can use separate consumer groups, transaction prefixes, output topics, and tables; see [job upgrades](docs/upgrades.md).
+The currently deployed processor still reads [config/jobs.yaml](config/jobs.yaml), emits the `events`, `nodes`, `edges`, and `metrics` tables, and uses fixed graph/aggregation primitives. That configuration is a legacy implementation detail scheduled for replacement, not the intended application-building API. Existing rows preserve workspace/resource labels and source-event references; edges also retain their target-resource scope.
 
 ### 4. Publish application views
+
+The target compiler derives GraphQL result types from prepared SQL metadata and operation bindings. The following examples document the **current** serving configuration, which still includes handwritten signatures pending that migration.
 
 Register authorized Iceberg sources and named queries in [config/queries.yaml](config/queries.yaml). The serving API combines registered schema information with configured GraphQL types and fields. DuckDB uses `iceberg` and `cache_httpfs` for lakehouse access.
 
