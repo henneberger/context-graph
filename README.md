@@ -1,35 +1,100 @@
 # Context Graph
 
-**Infrastructure for building applications on a permissioned, continuously updated context graph.**
+**A general-purpose platform for building applications on connected, evolving, permissioned data.**
 
-> **Proprietary software — not free software and not open source.** Copyright © 2026 Daniel Henneberger. All rights reserved. Use, modification, hosting, and redistribution require a separate written license. See [LICENSE](LICENSE). Third-party components retain their own licenses.
+> **Proprietary software — non-free and not open source.** Copyright © 2026 Daniel Henneberger. All rights reserved. Use, modification, hosting, and redistribution require a separate written license. See [LICENSE](LICENSE). Third-party components retain their own licenses.
 
-Context Graph is a platform for ingesting multimodal data, processing streams, persisting a lakehouse, and exposing a permissioned context graph to applications. It combines **Vert.x, Kafka, Flink, Iceberg, Polaris, DuckDB, and SpiceDB** into a configurable foundation that other products can build on.
+Context Graph provides the shared context layer between data sources and the applications that use them. It ingests JSON, images, and streaming video; processes events into entity and relationship projections and temporal metrics; persists them in a lakehouse; and serves authorized data through query and subscription APIs.
 
-Applications use the platform's query, graph, search, media, and subscription APIs. The platform handles ingestion, schema validation, temporal processing, storage, source identity mapping, authorization, and operational visibility. A Glean-style assistant and a metrics/video dashboard are included as **reference applications built on these capabilities**.
+Application builders define what their entities mean, how their data connects, which transformations produce useful context, and which views their products need. The platform supplies ingestion, transport, processing, storage, permission enforcement, serving, and operational visibility. The same foundation can support operational dashboards, investigation tools, relationship explorers, search products, and AI assistants.
 
-[Architecture](#architecture) · [Build applications](#building-applications-on-the-graph) · [Capabilities](#platform-capabilities) · [Security](#security-and-permissions) · [Configuration](#configuration) · [Operations](#operations-and-deployment) · [Local setup](#local-setup) · [License](#license)
+**Slack and GitHub are included ingestion examples. The Glean-style assistant and metrics/video dashboard are example applications built on the platform.** New sources and products integrate through the platform contracts described below. Core graph processing and serving do not require an LLM.
+
+[Context model](#the-context-model) · [Architecture](#architecture) · [Build on the platform](#building-on-the-platform) · [Permissions](#security-and-permissions) · [Configuration](#configuration) · [Local setup](#local-setup) · [Operations](#operations-and-deployment) · [Screenshots](#platform-and-reference-application-screenshots) · [Current limits](#current-scope-and-development-priorities)
 
 [![Context Graph platform architecture](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
 
-## Platform capabilities
+## What the platform is for
 
-| Capability | Implementation |
+Useful context connects an observation to the things it concerns, the relationships around those things, when it happened, where it came from, and who can use it. Applications need different views of that shared context: an operator may need recent measurements and video for an asset; an investigator may need related events and their evidence; an assistant may need authorized source material for an answer.
+
+In this project, a **context graph** is that connected representation, together with the pipelines and access rules that keep it usable as new data arrives. The domain graph is stored as Iceberg node, edge, and event tables and queried with DuckDB. SpiceDB maintains a separate authorization graph that determines visibility. GraphQL is the application interface; domain relationships are explicitly represented in the data.
+
+| Boundary | Responsibility |
 |---|---|
-| Configurable ingestion | Vert.x endpoints defined in JSON; a separate Kafka topic per endpoint |
-| Flexible JSON | Arbitrary payload fields inside a validated, server-labeled envelope; JSON Schema draft 2020-12 validation |
-| Images | PNG/JPEG ingestion, metadata extraction, private object storage, permission-checked delivery |
-| Streaming video | Backpressured FFmpeg ingestion, closed-GOP keyframe-aligned HLS segments, live playback |
-| Stream processing | Configurable Flink transformations, event-time aggregations, graph projections, Iceberg and Kafka sinks |
-| Lakehouse | Iceberg tables in RustFS object storage, registered in Apache Polaris |
-| Serving API | Generated/configured GraphQL fields, federated DuckDB queries, schema discovery, Kafka-backed subscriptions |
-| Authorization | Verified OIDC identities, SpiceDB workspace/entity/source permissions, fail-closed checks |
-| Source connectors | Temporal schedules for Slack and a GitHub repository allowlist, source identities, ACL synchronization, deletion handling |
-| Search capability | Permission-filtered lexical BM25, freshness weighting, and document lookup for downstream applications |
-| Operations | Separate read-only control frontend/API, Kubernetes inventory, source status, Prometheus metrics |
-| Validation | Unit tests, real-service security checks, source-permission expiry checks, media tests, and browser evidence |
+| Sources and adapters | Supply observations, stable source identifiers, source references, and verified permission mappings |
+| Platform | Validate and label events; process streams; retain graph projections and metrics; enforce access; expose configured views and live updates |
+| Domain extensions | Define entity types, relationship meaning, identity reconciliation, extraction logic, and application-specific transformations |
+| Applications | Compose authorized context into workflows, visualizations, retrieval experiences, and products |
 
-The platform is implemented and exercised on local Kubernetes. Its current deployment profile has the availability and scale limits described below. The graph currently contains entities, labeled events, configurable nodes/edges, source relationships, and user access relationships. Automatic extraction of a complete organizational ontology is future work.
+“General-purpose” describes the extensible foundation. It does not mean every source, domain model, or graph algorithm is already implemented. JSON/YAML covers the existing endpoint, projection, aggregation, and query primitives; new semantics can require adapter or processor code.
+
+## The context model
+
+### Entities, relationships, observations, and evidence
+
+| Primitive | Meaning | Representation today |
+|---|---|---|
+| Workspace | An explicit data and access boundary | `workspaceId` on envelopes; `workspace_id` on stored rows; SpiceDB membership |
+| Entity | A stable identifier for something in a domain, such as an asset, account, project, or document | Producer-supplied `entityId`, scoped to a workspace; node projections use this identifier |
+| Observation / event | A submitted occurrence or description of an entity | Validated envelope with `eventId`, `eventTime`, `ingestedAt`, `payload`, and trusted security labels |
+| Relationship | A directed connection with a declared meaning | Edge projection with source/target IDs, relation, event time, and source-event reference |
+| Properties | Domain-specific attributes and source content | Flexible JSON payloads; serialized JSON properties in Iceberg |
+| Evidence and provenance | A path back to the observation supporting a projection | Nodes and edges retain `source_event_id`; original event payloads and media references remain queryable |
+| Derived measure | A calculation over observations in a time window | Resource-scoped count, sum, average, minimum, and maximum |
+| Identity and access | Who can ingest, query, subscribe to, or retrieve an entity's data | Verified OIDC subjects and SpiceDB workspace/entity/source relationships |
+
+A conceptual application could relate an asset to a site, collect measurements and video against that asset, and show an incident alongside the observations that explain it:
+
+```mermaid
+flowchart LR
+  SITE["Site"] -->|contains| ASSET["Asset"]
+  INCIDENT["Incident"] -->|concerns| ASSET
+  EVENT["Measurement event"] -->|observes| ASSET
+  VIDEO["Video observation"] -->|depicts| ASSET
+  METRIC["Windowed metric"] -. derived from .-> EVENT
+  EVENT -. supports investigation .-> INCIDENT
+  USER["Caller"] -. authorized view .-> ASSET
+```
+
+This illustrates a domain model an application could build. The shipped projection produces one node per event and at most one configured outgoing relationship; richer typed relationships, incident inference, and per-result derivation links require extensions. Domain relationships such as `contains` do not implicitly grant access.
+
+### Identity and cross-source reconciliation
+
+Entity identity is workspace-scoped. The platform derives a canonical authorization resource ID as `SHA256(workspaceId + NUL + entityId)` and preserves that scope through Kafka, Flink, Iceberg, and serving. Producers must use deliberate, stable entity IDs; ingestion does not decide that two source records describe the same real-world entity.
+
+Cross-source matching, aliases, merge/split policy, and canonical entity ownership belong in domain-specific processing. A new adapter should namespace source identifiers and explicitly map identities when reconciliation is needed. Matching people by display name or unverified email is insufficient for granting access. The example adapters demonstrate trusted source-user mappings, separately from domain entity resolution.
+
+### Time and changing knowledge
+
+The model records **event time** (`eventTime`) and **ingestion time** (`ingestedAt`). Flink uses event time for windowed computation, while append-oriented Iceberg tables retain observations and projection versions. The configured node and edge queries select their latest versions by event time.
+
+That supports event history and recent state, with important boundaries: the current graph does not implement valid-from/valid-to fact intervals, automatic relationship retraction, contradiction resolution, or a complete “what did we know at time T?” API. Iceberg snapshots capture table versions; they do not by themselves establish domain-level temporal truth. Applications needing those semantics must define and implement them explicitly.
+
+### Provenance and derived context
+
+Source-event references let an application connect a node or edge projection to its input observation. Media metadata identifies stored originals or video chunks. A domain adapter can preserve additional source identifiers, revisions, and references in the payload.
+
+Complete derivation chains, model/prompt versions, confidence, decision rationale, and evidence supporting or invalidating individual claims are further modeling work. In particular, the current aggregate rows retain resource scope and window bounds, not an enumerated lineage graph of every contributing event. The example assistant's citations are an application-level use of source evidence.
+
+### Design references
+
+These concerns have established foundations: [W3C PROV](https://www.w3.org/TR/prov-overview/) describes provenance through entities, activities, agents, and derivation; [DataHub's metadata model](https://github.com/datahub-project/datahub/blob/master/docs/modeling/metadata-model.md) illustrates explicit entity identifiers, aspects, and relationships; [Graphiti's temporal graph model](https://help.getzep.com/graphiti/getting-started/overview) illustrates incrementally incorporating episodes into an evolving graph. These are design references, not dependencies or claims that this repository implements their models or conformance standards.
+
+## Implemented platform capabilities
+
+| Area | Available now | Current boundary |
+|---|---|---|
+| Ingestion | JSON-configured Vert.x endpoints, per-endpoint Kafka topics, JSON Schema validation, operational error topic | Flexible payloads still obey a fixed envelope and configured input contracts |
+| Multimodal data | PNG/JPEG metadata and originals; streamed video normalized into independent HLS chunks | OCR, transcription, semantic vision, and entity extraction are extension work |
+| Processing | Configurable Flink projections, event-time tumbling aggregations, Iceberg and Kafka outputs | Existing primitives are configured; arbitrary transformations require code |
+| Domain graph | Workspace-scoped node/edge projections and source-event references | No automatic entity resolution, ontology lifecycle, or native graph traversal engine |
+| Durable storage | Iceberg in private RustFS object storage with a Polaris REST catalog | Cross-table and Kafka/Iceberg commits are not globally atomic |
+| Serving | GraphQL, registered schema discovery, parameterized DuckDB queries and federation | Trusted definitions and bounded execution; no end-user arbitrary SQL or raw warehouse access |
+| Live context | Kafka-backed GraphQL subscriptions with per-emission authorization | Clients must handle reconnects; this is not a durable client replay API |
+| Access | OIDC, SpiceDB, scoped transformations, authorization before SQL, protected media | Imported permission freshness depends on the adapter's synchronization policy |
+| Operations | Independent read-only control plane, Kubernetes inventory, job/query visibility, metrics | Current infrastructure is a local development deployment, with single-node dependencies |
+| Extension examples | Temporal source workers; permissioned BM25/freshness search; cited assistant; metrics/video UI | Provider mappings and search document projection are example-specific |
 
 ## Architecture
 
@@ -40,10 +105,12 @@ The platform is implemented and exercised on local Kubernetes. Its current deplo
 
 ```mermaid
 flowchart TB
-  subgraph Sources
-    GEN[JSON / image / video generators]
-    EXT[Slack and GitHub]
-    TW[Temporal connector workers]
+  subgraph Source_extensions[Your data sources and ingestion extensions]
+    GEN[Event producers / JSON / images / video]
+    EXT[External systems and APIs]
+    TW[Source adapters / scheduled workers]
+    TS[Temporal scheduling and retries]
+    TS --> TW
     EXT --> TW
   end
   subgraph Ingestion
@@ -75,7 +142,7 @@ flowchart TB
   end
   subgraph Platform_serving[Platform serving APIs]
     Q[Vert.x GraphQL serving API]
-    D[DuckDB: iceberg + cache_httpfs + fts]
+    D[DuckDB: iceberg + cache_httpfs]
     Q --> D
     D --> P
     D --> W
@@ -99,14 +166,24 @@ flowchart TB
     A[SpiceDB]
     O -. verified JWT .-> I
     O -. verified JWT .-> Q
-    A -. permission checks .-> I
-    A -. permission checks .-> Q
+    CHECK[Check-only authorization gateway]
+    I -. permission checks .-> CHECK
+    Q -. permission checks .-> CHECK
+    CHECK --> A
     TW -. source ACL synchronization .-> A
+  end
+  subgraph Supporting_state[Supporting service state]
+    PG[(PostgreSQL: separate databases and roles)]
+    A --> PG
+    P --> PG
+    TW --> PG
   end
   subgraph Operations
     CP[Read-only control plane]
     K8S[Kubernetes API]
     PROM[Prometheus]
+    TELEMETRY[Service metrics / exporters / OpenTelemetry]
+    TELEMETRY --> PROM
     CP --> K8S
     CP --> PROM
     CP --> TW
@@ -115,14 +192,14 @@ flowchart TB
 
 </details>
 
-The demo nginx service provides the local browser entry point. `/search` routes to a **separate search frontend deployment**; the assistant backend is also separate. The control frontend and API deploy independently.
+The serving API is the application integration boundary. The control plane has its own API and frontend. Reference applications also run as separate services; their browser routing is described under local setup.
 
-The [detailed architecture documentation](docs/architecture.md), [lakehouse design](docs/lakehouse.md), and [search design](docs/search.md) describe the individual paths. Earlier [interactive](docs/diagrams/context-graph-architecture.html), [SVG](docs/diagrams/context-graph-architecture.svg), and [PDF](docs/diagrams/context-graph-architecture.pdf) diagrams document the core platform; the diagram above includes the subsequently added connector and assistant services.
+The [platform architecture](docs/architecture.md), [lakehouse design](docs/lakehouse.md), and [example search application](docs/search.md) describe the individual paths. Earlier [interactive](docs/diagrams/context-graph-architecture.html), [SVG](docs/diagrams/context-graph-architecture.svg), and [PDF](docs/diagrams/context-graph-architecture.pdf) diagrams document the core platform; the diagram above includes the subsequently added connector and assistant services.
 
 ### Data path
 
 1. An authenticated client or connector submits data to Vert.x. The API checks write access and adds canonical workspace/entity labels.
-2. JSON Schema validates input and Kafka envelopes. Metadata is published only after the required storage/publication steps succeed.
+2. JSON Schema validates input and Kafka envelopes. Metadata is published only after the required storage/publication steps succeed. Ingestion uses acknowledged, idempotent Kafka publication; validation/processing failures have an operational error topic. Authentication failures do not publish attacker-controlled records to that queue.
 3. Kafka isolates endpoint streams. Flink consumes labeled events, applies configured transformations, creates graph projections, and calculates temporal metrics.
 4. Flink writes Iceberg tables and optional Kafka outputs. Iceberg lives in RustFS; Polaris supplies catalog operations and service credential vending.
 5. The serving API checks the caller's permissions, materializes authorized source rows, then runs configured SQL. Kafka feeds authorized live subscriptions.
@@ -140,42 +217,135 @@ These are pinned repository versions, not an assertion that every component is t
 | Catalog / storage | Polaris 1.7.0, RustFS 1.0.0-beta.8 |
 | Authorization | SpiceDB 1.56.2, verified OIDC JWTs |
 | Supporting database | PostgreSQL 17.6, separated service databases/roles |
-| Connector scheduling | Temporal Python SDK; local persistent Temporal development server |
+| Scheduled ingestion | Temporal Python SDK; local persistent Temporal development server |
 | Frontends | React, TypeScript, shadcn components, nginx; hls.js in the video demo |
-| Assistant | DeepSeek Flash through the search API |
+| Example assistant | DeepSeek Flash through the example search API |
 | Telemetry | Prometheus, service metrics, exporters, OpenTelemetry collector |
 
 The Kafka/Iceberg connector compatibility checks are application-specific evidence for this Flink profile. A custom connector fork is not required by the current implementation; schema handling is implemented at the application boundary.
 
-## Building applications on the graph
+## Building on the platform
 
-The stable integration boundary is the serving API. Build new services and frontends on its authorized results rather than bypassing it with direct access to mixed-permission lakehouse files.
+### 1. Define the domain and access boundary
 
-| Extension point | How to build on it |
+Choose a workspace, stable entity IDs, and the resource granularity at which access must differ. Decide which source owns each identifier, what relationships mean, and how changes or deletions should be represented. Provision write/read grants through trusted administration before sending data.
+
+The current local-entity model is workspace-wide visibility with restricted entities. Imported entities additionally depend on verified source grants. An application's data model and its permission model must agree: placing unrelated restricted records under one entity would collapse their authorization boundary.
+
+### 2. Add an ingestion contract
+
+Add an endpoint in [config/ingestion.json](config/ingestion.json), its input schema in [config/schemas/](config/schemas/), and the corresponding Kafka topic and service ACLs. For a JSON endpoint, the configuration has this shape:
+
+```json
+{
+  "path": "/ingest/observations",
+  "name": "observations",
+  "kind": "json",
+  "topic": "cg.secure.observations",
+  "schema": "schemas/event-input.json"
+}
+```
+
+This is an illustrative new endpoint, not a preinstalled route. Configure the processor to consume its topic and deploy the associated broker provisioning and service configuration.
+
+A producer can submit the following body to the existing `/ingest/events` endpoint, using a verified bearer token and `X-Workspace-Id`, after the referenced entities and permissions are provisioned:
+
+```json
+{
+  "entityId": "asset-42",
+  "eventTime": "2026-09-24T12:00:00Z",
+  "entityType": "asset",
+  "relatedTo": "site-7",
+  "metric": "temperature",
+  "value": 21.4,
+  "unit": "celsius"
+}
+```
+
+The API supplies event identity, ingestion time, and trusted `security` labels. Clients cannot assert those labels. JSON Schema draft 2020-12 validates the input and emitted envelope; Flink validates consumed envelopes and configured outputs. The payload remains flexible within those contracts. Kafka's upstream string/byte connector is sufficient; flexible JSON does not require a connector fork.
+
+Images and video use raw upload endpoints and `X-Entity-Id`. Their bytes are stored privately; metadata and references enter Kafka. See [ingestion contracts](services/ingestion/README.md) for formats, limits, responses, and error behavior.
+
+### 3. Define projections and temporal processing
+
+[config/jobs.yaml](config/jobs.yaml) selects source topics, output tables/topics, graph pointers, windows, and recovery settings. For the observation above, a domain-specific projection can use:
+
+```yaml
+graph:
+  nodeTypePointer: /payload/entityType
+  targetPointer: /payload/relatedTo
+  relation: located_at
+
+aggregations:
+  - id: temperature-10s
+    valuePointer: /payload/value
+    metricPointer: /payload/metric
+    defaultMetric: temperature
+    windowSeconds: 10
+    scale: 1.0
+    offset: 0.0
+```
+
+This projects `asset-42` as an `asset`, emits an edge to `site-7`, and computes ten-second metrics. It does not create the target site's node automatically. The checked-in generic job instead uses `/kind` and the relation `related_to`; change those settings deliberately for a domain.
+
+Aggregations are keyed by workspace, resource, entity, and metric, preserving access boundaries. Watermarks account for out-of-order events and idle Kafka partitions. A fully idle input does not necessarily close its last window merely because wall-clock time passes.
+
+The default durable projections are:
+
+| Iceberg table | Content |
 |---|---|
-| New data sources | Add an authenticated producer or connector and configure endpoint/topic/schema mappings |
-| Stream transformations | Extend job configuration or processor code while preserving resource labels and scoped aggregation keys |
-| Graph relationships | Configure node/edge projections and add domain-specific relationships |
-| Durable application queries | Register Iceberg sources and named, parameterized GraphQL/SQL views |
-| Live application state | Consume authorized GraphQL subscriptions backed by Kafka outputs |
-| Search and AI products | Retrieve authorized documents, preserve source references, and recheck access before returning derived answers |
-| Media applications | Use protected image, playlist, chunk, and range endpoints |
+| `events` | Observations, source payloads, event and ingestion times |
+| `nodes` | Entity projection versions, type, properties, source-event reference |
+| `edges` | Directed relationship versions, both endpoint IDs/scopes, source-event reference |
+| `metrics` | Resource-scoped window bounds, count, sum, average, minimum, maximum |
 
-Use `/graphql` with a verified bearer token and `X-Workspace-Id`. The generated schema exposes configured metrics, nodes, edges, media, schemas, federated fields, and document search. For example:
+All carry workspace/resource labels; edges additionally carry target-resource labels. The graph is queried relationally over these tables. Add processor logic and registered tables for richer domain semantics. Multiple versioned jobs can use separate consumer groups, transaction prefixes, output topics, and tables; see [job upgrades](docs/upgrades.md).
+
+### 4. Publish application views
+
+Register authorized Iceberg sources and named queries in [config/queries.yaml](config/queries.yaml). The serving API combines registered schema information with configured GraphQL types and fields. DuckDB uses `iceberg` and `cache_httpfs` for lakehouse access.
+
+For example, the shipped configuration defines:
+
+```yaml
+metricTotals:
+  signature: 'metricTotals(metric: String!): [MetricTotal!]!'
+  table: context_secure.metrics
+  sql: >-
+    SELECT metric, sum(sample_count) AS sample_count,
+           sum(sum_value) AS sum_value
+    FROM source WHERE metric = :metric GROUP BY metric
+```
+
+An application calls `/graphql` with its bearer token and workspace:
 
 ```graphql
 query {
-  metricTotals(metric: "value") {
+  metricTotals(metric: "temperature") {
     metric
     sample_count
     sum_value
   }
+  nodes(limit: 20) {
+    node_id
+    node_type
+    source_event_id
+  }
+  edges(limit: 20) {
+    source_id
+    target_id
+    relation
+  }
 }
 ```
 
-The sum is calculated from authorized contributors. Add named queries and registered sources in YAML to create additional application views. Federated queries authorize each registered Iceberg input separately before joining them. Schema discovery does not expose raw storage credentials or arbitrary physical metadata paths.
+The serving API materializes authorized inputs **before executing configured SQL**, so totals are computed from visible contributors. Federated queries authorize each registered source before joining it; the shipped `entityMetrics` query demonstrates joining nodes and metrics. Request values are bound parameters. Schema discovery excludes unregistered sources and physical credential-bearing metadata.
 
-For live data, initialize a `graphql-transport-ws` connection with:
+Applications receive structured results through this boundary. Direct Polaris/object-store credentials are reserved for trusted services because files can mix rows with different permissions.
+
+### 5. Subscribe and compose an application
+
+Use `graphql-transport-ws` for live subscriptions. Initialize the connection with:
 
 ```json
 {
@@ -187,9 +357,166 @@ For live data, initialize a `graphql-transport-ws` connection with:
 }
 ```
 
-Then subscribe to configured fields such as `metricUpdated`. Kafka streams supply live results; Iceberg supplies durable queryable state. Cross-table snapshots and Kafka/Iceberg transactions are not globally atomic.
+Then send a protocol subscription request for fields such as:
 
-Useful next applications include project activity views, ownership/relationship exploration, change summaries, and decision timelines. Rich automatic links between people, projects, decisions, conversations, and code changes are an extension of the current foundation, not something this README claims is already complete.
+```graphql
+subscription {
+  metricUpdated(entityId: "asset-42") {
+    entity_id
+    metric
+    window_end
+    avg_value
+  }
+}
+```
+
+Use the workspace in which the entity was provisioned. Kafka output topics feed subscription routes and Reactor Flux consumers. Each serving replica has its own consumer group for delivery to its connected clients, with bounded buffers, cancellation, expiry, and permission checks on emissions. Iceberg supplies durable query state; subscriptions supply live updates.
+
+An application can combine these views with protected media, domain-specific queries, and its own interface. AI applications must preserve evidence references and maintain authorization through derived outputs; the included assistant demonstrates that pattern. External actions, workflow approvals, and write-back to source systems are application responsibilities, not a general action engine currently supplied here.
+
+## Security and permissions
+
+### Local entities
+
+Workspace members can view unrestricted entities. Restricted entities require an explicit reader/writer grant or workspace administration. Ingestion requires an explicit writer grant or workspace administration. The demo fixture gives Alice access to `alpha`/`shared`, Bob to `beta`/`shared`, and producer write access to the demo entities. The `other` workspace remains isolated.
+
+### Imported sources
+
+Imported entities do **not** inherit workspace-admin visibility bypasses. Reading requires workspace access **and** an applicable source grant. An ingestion adapter is responsible for translating its source system's verified access rules into these grants; the platform enforces them when serving data.
+
+In the included examples, the Slack adapter conservatively grants active human channel members access, and the GitHub adapter distinguishes public repositories from verified private-repository readers. A different source adapter must implement its own permission mapping against the same platform authorization contract.
+
+Source grants support SpiceDB server-side relationship expiration. The example adapter configuration refreshes permissions every three minutes with ten-minute leases. Failed refreshes attempt immediate revocation; unavailable infrastructure cannot renew the lease. Remote revocation is therefore bounded by polling/lease expiry, not instantaneous. Local serving checks use fully consistent SpiceDB reads.
+
+### End-to-end enforcement
+
+- JWT signature, issuer, audience, and expiry are verified. Caller-supplied identities and security labels are not trusted.
+- Canonical resource labels are derived from workspace and entity. Flink preserves scope through transformations and aggregation keys.
+- SQL executes on authorized, materialized input rows **before** aggregation. Graph edges require permission on both endpoints.
+- Query results and model inputs are rechecked. Authorization failures deny access rather than falling back to unfiltered data.
+- GraphQL subscriptions use `graphql-transport-ws`, bounded buffers, per-emission checks, cancellation, and expiry handling.
+- Media paths, playlists, byte ranges, and chunks require current access. Cookie sessions do not authorize writes.
+- Kafka uses SASL_SSL with service-specific ACLs. TLS and network policies isolate internal services.
+
+The domain graph and authorization graph have separate purposes: adding an edge between domain entities does not grant access. Authorization is enforced on the inputs and outputs of graph queries, not just at the browser or GraphQL field boundary. Configurable SQL runs in a credential-free DuckDB execution context with external access disabled and its configuration locked.
+
+Polaris supplies service-level catalog privileges and temporary warehouse credentials. SpiceDB supplies user-level entity permissions in the serving API. Because individual Parquet files can contain rows with different permissions, **users must not receive raw Polaris/S3 access to those files**. New applications should use the serving API.
+
+PostgreSQL persists SpiceDB and Polaris state and connector bookkeeping in separate databases/roles. It is not the analytical query engine. Connector bookkeeping stores identities, fingerprints, and tombstone metadata, not a second full-text corpus.
+
+See [security architecture](docs/security-architecture.md), [network boundaries](docs/network-security.md), and [source authorization](docs/search.md) for trust assumptions, exact contracts, and deployment-specific limits.
+
+## Configuration
+
+| File | Controls |
+|---|---|
+| [config/ingestion.json](config/ingestion.json) | Endpoint paths, topics, schemas, upload limits |
+| [config/schemas/](config/schemas/) | Input, envelope, and output JSON Schemas |
+| [config/jobs.yaml](config/jobs.yaml) | Flink sources, graph projections, event-time windows, sinks |
+| [config/query.yaml](config/query.yaml) | Query workers, queues, memory/time/row/resource bounds |
+| [config/queries.yaml](config/queries.yaml) | Registered Iceberg tables, GraphQL fields, SQL, search ranking, subscriptions |
+| [config/connectors/sources.yaml](config/connectors/sources.yaml) | Bundled adapter examples: provider-specific scope, schedules, identity links |
+| [config/security/schema.zed](config/security/schema.zed) | Workspace, entity, source, and external-identity permissions |
+| [deploy/k8s/](deploy/k8s/) | Workloads, storage, services, metrics, and network policies |
+
+Configuration is trusted deployment input. End users cannot submit arbitrary SQL or redefine security labels. The renderer creates versioned service-specific ConfigMaps. Workers reconcile schedule settings at startup; roll them after changing schedule configuration.
+
+## Operations and deployment
+
+### Control plane and metrics
+
+The control plane reads namespace-scoped Kubernetes inventory, referenced API/query/job definitions, connector status, and bounded Prometheus summaries. It cannot read Secrets, execute commands in pods, modify deployments, or run arbitrary queries. Platform administration is separate from workspace membership.
+
+Annotated service replicas expose internal Prometheus metrics for API latency/status, search/model outcomes, connector ingestion, Flink, Kafka, PostgreSQL, Polaris, SpiceDB, RustFS, Temporal, and frontend traffic. See [control-plane operations](docs/control-plane.md).
+
+### Recovery and rollouts
+
+- Flink uses incremental RocksDB checkpoints, retained checkpoints/savepoints, and Kubernetes HA metadata. Recovery objects live in `s3://context-recovery`.
+- The warehouse and media use separate RustFS buckets and service identities. Polaris vends scoped warehouse credentials to trusted readers/writers.
+- APIs/frontends/workers use replicas, readiness, graceful termination, and disruption budgets for rolling deployment.
+- Savepoint upgrades can pause output while Kafka retains input. Existing WebSockets and active video uploads may need to reconnect.
+- [Versioned Flink upgrades](docs/upgrades.md) isolate consumer groups, transaction prefixes, topics, and tables for candidate/rollback workflows; they require spare capacity.
+
+For an existing installation, `scripts/provision-connectors.py` provisions connector/search secrets and `scripts/deploy-search.py` stages their release. Do not replay storage migrations or delete persistent volumes as a normal application update.
+
+### Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Stale page or port-forward failure after rollout | Restart the dashboard forward and reload `/search` |
+| Workspace unavailable | Correct local account, selected workspace, and SpiceDB grants; demo and knowledge membership differ |
+| Slack `not_in_channel` | Invite the bot to the channel; wait for or trigger the next content sweep |
+| Missing replies or partial source | Inspect connector status for source scopes/rate limits; incomplete snapshots do not infer deletions |
+| No recent aggregate | Event-time watermark advancement, Kafka lag, and completed Flink checkpoints |
+| Missing Iceberg updates | Flink job state/checkpoints, Polaris access, object storage, and source status |
+| Interrupted assistant response | Retry after checking source authorization, source changes, DeepSeek availability, and search error metrics |
+| New pods cannot communicate | NetworkPolicy enforcement and explicit allow rules; do not disable authorization as a workaround |
+
+## Included adapters and reference applications
+
+The repository includes working integrations to exercise the platform end to end. Their source-specific behavior belongs to the examples; adding an unrelated domain does not require adopting their document model or user experience.
+
+| Example | What it demonstrates |
+|---|---|
+| Slack and GitHub adapters | Scheduled Temporal polling, endpoint/topic separation, stable source IDs, source-user mapping, expiring source grants, and tombstones |
+| Workplace search and assistant | Authorized document retrieval, BM25 with recency weighting, streamed cited answers, and follow-up questions |
+| Metrics/video dashboard | Structured queries, graph views, temporal metrics, and protected chunked video |
+| JSON/image/video generators | Authenticated producers, schema variation, temporal disorder, and media load |
+
+The source workers currently implement those two providers in code; they are not a universal declarative connector SDK. A new adapter must implement its own source pagination, retries, revisions/deletion semantics, identity mapping, and permission synchronization. The example search projection specifically understands their document payloads; generalizing search to another source requires a compatible projection or engine changes.
+
+### Workplace search and assistant
+
+The included Glean-style reference application at the `/search` route demonstrates the platform’s retrieval and permission APIs. Its experience is a conversation: ask a question, see live retrieval activity, receive cited paragraphs as they are generated, inspect sources in a side panel, and ask follow-ups. Traditional document search is a separate view.
+
+#### Retrieval and ranking
+
+This reference application is demonstrated using the example Slack and GitHub adapters: messages/replies, README content, issues, PRs, comments/review comments, and default-branch commit messages. Complete snapshots detect removals and emit tombstones. Stable document IDs and fingerprints make retries replay-safe; the current-document projection resolves duplicate versions.
+
+The serving API builds an ephemeral DuckDB FTS index from the caller's current authorized documents. Ranking uses:
+
+```text
+score = BM25 × (1 + recencyWeight × freshness) × (1 + titleBoost) × typeWeight
+freshness = 2 ^ (-ageDays / halfLifeDays)
+```
+
+[Query configuration](config/queries.yaml) controls weights and half-lives. Defaults favor recent messages, allow longer relevance for repository documentation, and distinguish document types. Source/date filters and newest-first sorting are available. Initial assistant retrieval balances Slack and GitHub so short chat matches cannot exclude all repository context.
+
+This is lexical retrieval with freshness weighting, **not embedding/vector search or a reproduction of Glean's complete ranking system**.
+
+#### Answers and streaming
+
+DeepSeek plans a bounded number of additional keyword searches, then generates an answer using authorized evidence and short citation IDs. The API consumes provider streaming output and emits SSE activity and complete paragraphs. Each paragraph is withheld until its citation IDs and current source permissions are checked. This is real incremental delivery, not simulated typing or disclosure of internal model reasoning.
+
+Follow-ups pass previous user questions as context and retrieve authorized evidence again. They do not reuse previous assistant text as an authoritative source. Malformed output can be regenerated once; fabricated IDs are never repaired by guessing. Stream errors clear the current answer. Citation validation proves provenance and access, not the semantic correctness of every model interpretation.
+
+Only authorized source text is sent to DeepSeek. Credentials and document bodies are not logged as operational messages or metrics labels. See [search implementation and limits](docs/search.md).
+
+## Platform and reference-application screenshots
+
+These screenshots show the running platform and included reference applications with demonstration data.
+
+**Platform control plane** — infrastructure inventory, Flink jobs, source status, query definitions, and metrics.
+
+<details>
+<summary>View the read-only platform control plane</summary>
+
+![Context Graph platform control plane](docs/control-plane.png)
+
+</details>
+
+**Multimodal reference application** — graph relationships, temporal metrics, and protected keyframe-aligned video.
+
+![Multimodal reference application built on Context Graph](docs/dashboard-secure.png)
+
+<details>
+<summary>Glean-style reference application built on the platform</summary>
+
+The assistant demonstrates permissioned retrieval, streamed answers, and citations. It is one application on the platform.
+
+![Example assistant using the Context Graph APIs](docs/search-answer.png)
+
+</details>
 
 ## Local setup
 
@@ -217,9 +544,11 @@ export STORAGE_NODE=docker-desktop
 
 Substitute your actual context and node hostname. Deployment scripts require explicit cluster selection; they install/enforce network policies and provision persistent resources.
 
-### 2. Prepare private connector credentials
+### 2. Configure the bundled example deployment
 
-The full deployment includes connectors and search, so provide their credentials before running it. This example prompts without echoing secret values or placing them in shell history:
+The checked-in deployment script currently provisions the platform **together with its reference adapters and applications**. Consequently, running this particular profile requires credentials for the bundled examples. These providers are not requirements of the platform's ingestion contract. A separate core-only deployment profile has not yet been packaged.
+
+The following credentials belong to the **Slack/GitHub adapter and assistant examples**, not to the general-purpose platform. The prompts do not echo secrets or place them in shell history:
 
 ```sh
 python - <<'PY'
@@ -242,9 +571,9 @@ PY
 
 Use a GitHub token that can read the selected repository's metadata, contents, commits, issues, and pull requests. Slack needs user/channel enumeration and history access for the intended channel types; thread access must also be available. Invite the bot to the channels it should ingest. Polling does not require a Slack signing secret or an app-level socket token. Connector errors surface missing scopes and inaccessible channels rather than treating partial reads as complete.
 
-Review [config/connectors/sources.yaml](config/connectors/sources.yaml) before deployment. The checked-in local profile indexes **only `MariHQ/mari`** plus readable Slack channels. Its explicit identity links are deployment-specific; replace them for another installation. Do not infer identity links from display names.
+Review [config/connectors/sources.yaml](config/connectors/sources.yaml) before running these examples. The sample adapter configuration selects `MariHQ/mari` and readable Slack channels. This is example data-source configuration, not platform-wide scope. Its identity links are deployment-specific; replace them for another installation. Do not infer identity links from display names.
 
-### 3. Build and deploy
+### 3. Build and deploy the supplied profile
 
 ```sh
 ./scripts/build.sh
@@ -298,91 +627,6 @@ Local passwords are generated in `.runtime/security/credentials.json`; there is 
 
 Browser tokens stay in memory and expire. A port forward ends when its selected pod is replaced; restart it after a rollout if necessary. Loopback HTTP is a development entry point. A non-local browser deployment requires a properly configured TLS ingress and production identity flow.
 
-## Security and permissions
-
-### Local entities
-
-Workspace members can view unrestricted entities. Restricted entities require an explicit reader/writer grant or workspace administration. Ingestion requires an explicit writer grant or workspace administration. The demo fixture gives Alice access to `alpha`/`shared`, Bob to `beta`/`shared`, and producer write access to the demo entities. The `other` workspace remains isolated.
-
-### Imported sources
-
-Imported Slack/GitHub entities do **not** inherit workspace-admin visibility bypasses. Reading requires workspace access **and** an applicable source grant. Slack access is conservatively granted to active human channel members. Public GitHub content is readable by knowledge-workspace members; private repository access is conservatively limited to verified readers that the source API can establish.
-
-Source grants use SpiceDB server-side relationship expiration: permission refreshes run every three minutes and leases last ten minutes. Failed refreshes attempt immediate revocation; unavailable infrastructure cannot renew the lease. Remote revocation is therefore bounded by polling/lease expiry, not instantaneous. Local serving checks use fully consistent SpiceDB reads.
-
-### End-to-end enforcement
-
-- JWT signature, issuer, audience, and expiry are verified. Caller-supplied identities and security labels are not trusted.
-- Canonical resource labels are derived from workspace and entity. Flink preserves scope through transformations and aggregation keys.
-- SQL executes on authorized, materialized input rows **before** aggregation. Graph edges require permission on both endpoints.
-- Query results and model inputs are rechecked. Authorization failures deny access rather than falling back to unfiltered data.
-- GraphQL subscriptions use `graphql-transport-ws`, bounded buffers, per-emission checks, cancellation, and expiry handling.
-- Media paths, playlists, byte ranges, and chunks require current access. Cookie sessions do not authorize writes.
-- Kafka uses SASL_SSL with service-specific ACLs. TLS and network policies isolate internal services.
-
-Polaris supplies service-level catalog privileges and temporary warehouse credentials. SpiceDB supplies user-level entity permissions in the serving API. Because individual Parquet files can contain rows with different permissions, **users must not receive raw Polaris/S3 access to those files**. New applications should use the serving API.
-
-PostgreSQL persists SpiceDB and Polaris state and connector bookkeeping in separate databases/roles. It is not the analytical query engine. Connector bookkeeping stores identities, fingerprints, and tombstone metadata, not a second full-text corpus.
-
-See [security architecture](docs/security-architecture.md), [network boundaries](docs/network-security.md), and [source authorization](docs/search.md) for trust assumptions, exact contracts, and deployment-specific limits.
-
-## Reference application: workplace search and assistant
-
-The included Glean-style reference application at the `/search` route demonstrates the platform’s retrieval and permission APIs. Its experience is a conversation: ask a question, see live retrieval activity, receive cited paragraphs as they are generated, inspect sources in a side panel, and ask follow-ups. Traditional document search is a separate view.
-
-### Retrieval and ranking
-
-The connector indexes Slack messages/replies and the selected repository's README, issues, PRs, comments/review comments, and default-branch commit messages. Complete snapshots detect removals and emit tombstones. Stable document IDs and fingerprints make retries replay-safe; the current-document projection resolves duplicate versions.
-
-The serving API builds an ephemeral DuckDB FTS index from the caller's current authorized documents. Ranking uses:
-
-```text
-score = BM25 × (1 + recencyWeight × freshness) × (1 + titleBoost) × typeWeight
-freshness = 2 ^ (-ageDays / halfLifeDays)
-```
-
-[Query configuration](config/queries.yaml) controls weights and half-lives. Defaults favor recent messages, allow longer relevance for repository documentation, and distinguish document types. Source/date filters and newest-first sorting are available. Initial assistant retrieval balances Slack and GitHub so short chat matches cannot exclude all repository context.
-
-This is lexical retrieval with freshness weighting, **not embedding/vector search or a reproduction of Glean's complete ranking system**.
-
-### Answers and streaming
-
-DeepSeek plans a bounded number of additional keyword searches, then generates an answer using authorized evidence and short citation IDs. The API consumes provider streaming output and emits SSE activity and complete paragraphs. Each paragraph is withheld until its citation IDs and current source permissions are checked. This is real incremental delivery, not simulated typing or disclosure of internal model reasoning.
-
-Follow-ups pass previous user questions as context and retrieve authorized evidence again. They do not reuse previous assistant text as an authoritative source. Malformed output can be regenerated once; fabricated IDs are never repaired by guessing. Stream errors clear the current answer. Citation validation proves provenance and access, not the semantic correctness of every model interpretation.
-
-Only authorized source text is sent to DeepSeek. Credentials and document bodies are not logged as operational messages or metrics labels. See [search implementation and limits](docs/search.md).
-
-## Configuration
-
-| File | Controls |
-|---|---|
-| [config/ingestion.json](config/ingestion.json) | Endpoint paths, topics, schemas, upload limits |
-| [config/schemas/](config/schemas/) | Input, envelope, and output JSON Schemas |
-| [config/jobs.yaml](config/jobs.yaml) | Flink sources, graph projections, event-time windows, sinks |
-| [config/query.yaml](config/query.yaml) | Query workers, queues, memory/time/row/resource bounds |
-| [config/queries.yaml](config/queries.yaml) | Registered Iceberg tables, GraphQL fields, SQL, search ranking, subscriptions |
-| [config/connectors/sources.yaml](config/connectors/sources.yaml) | Repository allowlist, Slack scope, schedules, identity links |
-| [config/security/schema.zed](config/security/schema.zed) | Workspace, entity, source, and external-identity permissions |
-| [deploy/k8s/](deploy/k8s/) | Workloads, storage, services, metrics, and network policies |
-
-Configuration is trusted deployment input. End users cannot submit arbitrary SQL or redefine security labels. The renderer creates versioned service-specific ConfigMaps. Workers reconcile schedule settings at startup; roll them after changing schedule configuration.
-
-A configured temporal aggregation, for example:
-
-```yaml
-aggregations:
-  - id: value-10s
-    valuePointer: /payload/value
-    metricPointer: /payload/metric
-    defaultMetric: value
-    windowSeconds: 10
-    scale: 1.0
-    offset: 0.0
-```
-
-Event-time windows depend on advancing watermarks. A fully idle input does not necessarily close its last window because wall-clock time passed. Aggregation scope always includes the authorization boundary.
-
 ## Generators and media
 
 Acquire a producer token without printing it:
@@ -408,37 +652,6 @@ Generators support schema variation, malformed data, timestamp disorder, and vid
 Video is transcoded to normalized, closed-GOP output with approximately two-second independent HLS segments. This guarantees decodable chunk boundaries rather than preserving every original input keyframe. Complete chunks are uploaded before playlist references and metadata are published. Playback targets roughly ten seconds or less on adequate hardware; it is not an unconditional latency guarantee. Clients must inspect the final NDJSON upload record for completion/errors.
 
 See [generator documentation](generators/README.md), [ingestion behavior](services/ingestion/README.md), and the [metrics/video demo](docs/dashboard-secure.png).
-
-## Operations and deployment
-
-### Control plane and metrics
-
-The control plane reads namespace-scoped Kubernetes inventory, referenced API/query/job definitions, connector status, and bounded Prometheus summaries. It cannot read Secrets, execute commands in pods, modify deployments, or run arbitrary queries. Platform administration is separate from workspace membership.
-
-Annotated service replicas expose internal Prometheus metrics for API latency/status, search/model outcomes, connector ingestion, Flink, Kafka, PostgreSQL, Polaris, SpiceDB, RustFS, Temporal, and frontend traffic. See [control-plane operations](docs/control-plane.md).
-
-### Recovery and rollouts
-
-- Flink uses incremental RocksDB checkpoints, retained checkpoints/savepoints, and Kubernetes HA metadata. Recovery objects live in `s3://context-recovery`.
-- The warehouse and media use separate RustFS buckets and service identities. Polaris vends scoped warehouse credentials to trusted readers/writers.
-- APIs/frontends/workers use replicas, readiness, graceful termination, and disruption budgets for rolling deployment.
-- Savepoint upgrades can pause output while Kafka retains input. Existing WebSockets and active video uploads may need to reconnect.
-- [Versioned Flink upgrades](docs/upgrades.md) isolate consumer groups, transaction prefixes, topics, and tables for candidate/rollback workflows; they require spare capacity.
-
-For an existing installation, `scripts/provision-connectors.py` provisions connector/search secrets and `scripts/deploy-search.py` stages their release. Do not replay storage migrations or delete persistent volumes as a normal application update.
-
-### Troubleshooting
-
-| Symptom | Check |
-|---|---|
-| Stale page or port-forward failure after rollout | Restart the dashboard forward and reload `/search` |
-| Workspace unavailable | Correct local account, selected workspace, and SpiceDB grants; demo and knowledge membership differ |
-| Slack `not_in_channel` | Invite the bot to the channel; wait for or trigger the next content sweep |
-| Missing replies or partial source | Inspect connector status for source scopes/rate limits; incomplete snapshots do not infer deletions |
-| No recent aggregate | Event-time watermark advancement, Kafka lag, and completed Flink checkpoints |
-| Missing Iceberg updates | Flink job state/checkpoints, Polaris access, object storage, and source status |
-| Interrupted assistant response | Retry after checking source authorization, source changes, DeepSeek availability, and search error metrics |
-| New pods cannot communicate | NetworkPolicy enforcement and explicit allow rules; do not disable authorization as a workaround |
 
 ## Validation
 
@@ -477,32 +690,6 @@ python scripts/security-smoke.py --help
 
 Recorded evidence includes [streamed Mari answers](docs/evidence/streaming-search.json), [assistant browser checks](docs/evidence/assistant-browser.json), [source lease expiry](docs/evidence/source-permissions.json), [pipeline security](docs/evidence/search-pipeline-security.json), and [control-plane checks](docs/evidence/control-plane.json). These record particular runs, not continuous guarantees or general capacity benchmarks.
 
-## Platform and reference-application screenshots
-
-These screenshots show the running platform and included reference applications with demonstration data.
-
-**Platform control plane** — infrastructure inventory, Flink jobs, source status, query definitions, and metrics.
-
-<details>
-<summary>View the read-only platform control plane</summary>
-
-![Context Graph platform control plane](docs/control-plane.png)
-
-</details>
-
-**Multimodal reference application** — graph relationships, temporal metrics, and protected keyframe-aligned video.
-
-![Multimodal reference application built on Context Graph](docs/dashboard-secure.png)
-
-<details>
-<summary>Glean-style reference application built on the platform</summary>
-
-The assistant demonstrates permissioned retrieval, streamed answers, and citations. It is one application on the platform.
-
-![Example assistant using the Context Graph APIs](docs/search-answer.png)
-
-</details>
-
 ## Repository layout
 
 ```text
@@ -518,7 +705,7 @@ services/
   ingestion/               Vert.x ingestion and protected media delivery
   processor/               Flink processing and lakehouse integration
   query/                   GraphQL, DuckDB federation, search, subscriptions
-  connectors/              Temporal Slack/GitHub workers
+  connectors/              Example Slack/GitHub adapters implemented as Temporal workers
   search-api/              Authorized retrieval and DeepSeek streaming answers
   search-ui/               Conversational workplace frontend
   dashboard/               Metrics/video demo and local route to /search
@@ -529,17 +716,27 @@ services/
 
 `.runtime/`, `.data/`, build output, credentials, and local dependency directories are excluded from source control.
 
-## Current scope and limitations
+## Current scope and development priorities
 
-- The single local RustFS instance, PostgreSQL instance, and selected storage node are availability limits. They do not provide zero downtime during node or storage/database failure.
-- Temporal runs as a persistent **development server**, not a production highly available Temporal cluster.
-- Source ACL changes are detected by polling and bounded leases; content updates/deletions follow the content sweep schedule.
-- Search rebuilds a per-request authorized FTS index, bounded at 10,000 current documents / 16 MiB text, plus serving-layer resource limits. A larger deployment needs a scalable index with equivalent authorization guarantees.
-- Full source scans replay from the beginning after interruption. HTTP acknowledgement and connector bookkeeping are not one transaction; deduplication is logical in the document projection.
-- Raw Kafka error topics, object storage, and Polaris are trusted operational interfaces, not general end-user access paths.
-- The connector currently holds trusted SpiceDB mutation credentials behind network policy; a narrower mutation broker would reduce its privilege.
-- Production OIDC integration, distributed storage/database HA, certificate rotation, retention, backups, capacity sizing, and external TLS ingress require deployment-specific work.
-- Rich semantic entity extraction, embeddings, organization-wide personalization, and a complete Glean-equivalent product are not implemented.
+The foundation is implemented and exercised on local Kubernetes. The following boundaries matter when building on it:
+
+| Area | Current limit / further work |
+|---|---|
+| Domain modeling | Add a versioned type/relationship registry, domain constraints, cross-source reconciliation, and entity merge/split semantics as needed |
+| Temporal facts | Implement explicit validity intervals, retraction/invalidation, correction policies, and historical fact queries for domains that require them |
+| Provenance | Extend source-event references into derivation chains, evidence attribution, and transformation/model version tracking |
+| Graph retrieval | Add domain traversal/query patterns; a native graph engine, semantic extraction, and embeddings are not currently implemented |
+| Schema evolution | Input/output contracts exist; coordinated compatibility policy and migration tooling across producers, jobs, tables, and APIs need further work |
+| Delivery semantics | HTTP retries can duplicate logical events; Kafka and Iceberg commits are independent. Do not assume platform-wide exactly-once or globally atomic snapshots |
+| Deletion and retention | Example adapters emit logical tombstones; generic graph retraction, media retention, and physical historical-data erasure need explicit lifecycle policies |
+| Scale | Query materialization is bounded. Example search rebuilds an authorized FTS index per request, limited to 10,000 current documents / 16 MiB of text |
+| Source freshness | Example full scans restart after interruption; content changes follow polling, and source authorization follows refresh/lease expiry |
+| Availability | The local RustFS instance, PostgreSQL instance, and selected storage node are single points of failure; Temporal is a persistent development server |
+| Deployment packaging | The supplied deployment bundles the platform and examples; a separate core-only profile is not yet packaged |
+| Production hardening | Production identity/browser flow, external TLS ingress, certificate rotation, HA storage/database, backup/restore, retention, and capacity sizing need deployment-specific work |
+| Privileged operations | Cluster/node administrators are trusted. The example connector holds SpiceDB mutation credentials behind network policy; a narrower mutation broker would reduce privilege |
+
+Rolling application deployments and Flink recovery reduce interruption, but the local stack does not guarantee zero downtime for all components. Existing WebSockets/video uploads can need reconnection, and savepoint upgrades can pause processing while Kafka buffers input. Treat the recorded test runs as evidence for specific configurations, not as an SLA or capacity benchmark.
 
 ## License
 

@@ -1,4 +1,6 @@
-# Permissioned workplace search
+# Reference application: permissioned workplace search
+
+This application and its Slack/GitHub ingestion adapters are examples built on the general-purpose Context Graph platform. Other data sources and products integrate through the same ingestion and serving contracts.
 
 The search reference application is routed at `/search` through the dashboard forward on port `18088`, with its own React/shadcn frontend and search API. The read-only control frontend uses a separate forward on port `18089`. Use the existing local admin login. Tokens stay in browser memory. To recreate the forwards:
 

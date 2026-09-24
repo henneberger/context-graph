@@ -15,11 +15,11 @@
 <text x="1095" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">05</text>
 <text x="1125" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">SERVE</text>
 <rect x="55" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
-<text x="90" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Connected sources</text>
-<text x="77" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Slack + GitHub</text>
+<text x="90" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Your data sources</text>
+<text x="77" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Applications + external APIs</text>
 <text x="77" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">JSON events, images, video</text>
-<text x="77" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Temporal schedules + retries</text>
-<text x="77" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SOURCE IDENTITIES + ACL SYNC</text>
+<text x="77" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Custom producers / adapters</text>
+<text x="77" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">CONFIGURABLE INGESTION CONTRACTS</text>
 <rect x="315" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="333" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
 <text x="350" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Vert.x ingestion</text>
 <text x="337" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">JSON-driven endpoints</text>
@@ -41,7 +41,7 @@
 <rect x="1095" y="262" width="450" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1113" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
 <text x="1130" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">GraphQL + DuckDB</text>
 <text x="1117" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Authorized materialization before SQL</text>
-<text x="1117" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">iceberg + cache_httpfs + per-user FTS</text>
+<text x="1117" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">iceberg + cache_httpfs; registered views</text>
 <text x="1117" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Federated queries • schemas • live subscriptions</text>
 <text x="1117" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">CURRENT PERMISSIONS CHECKED AGAIN</text>
 <path d="M280 334 H315" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
@@ -49,10 +49,10 @@
 <path d="M800 334 H835" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
 <path d="M1060 334 H1095" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
 <rect x="55" y="467" width="340" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="488" width="5" height="23" rx="2" fill="#8e73bd"/>
-<text x="90" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Temporal workers</text>
-<text x="77" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">15-minute content sweeps</text>
-<text x="77" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">3-minute source ACL refresh; 10-minute leases</text>
-<text x="77" y="590" fill="#8e73bd" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SLACK / REPO PERMISSIONS ARE SOURCE-OWNED</text>
+<text x="90" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Scheduled ingestion</text>
+<text x="77" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Temporal workflows, polling, and retries</text>
+<text x="77" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Adapter-owned source and permission mapping</text>
+<text x="77" y="590" fill="#8e73bd" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">PROVIDER-SPECIFIC ADAPTERS ARE EXTENSIONS</text>
 <rect x="420" y="467" width="340" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="438" y="488" width="5" height="23" rx="2" fill="#3d9d91"/>
 <text x="455" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Durability &amp; streaming</text>
 <text x="442" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Flink incremental checkpoints + savepoints</text>
@@ -66,8 +66,8 @@
 <rect x="1150" y="467" width="395" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1168" y="488" width="5" height="23" rx="2" fill="#527ce5"/>
 <text x="1185" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Build on the platform</text>
 <text x="1172" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Your applications consume authorized APIs</text>
-<text x="1172" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Example: cited search and assistant products</text>
-<text x="1172" y="590" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">GRAPH / QUERIES / SEARCH / MEDIA / SUBSCRIPTIONS</text>
+<text x="1172" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Domain views, live state, evidence, and media</text>
+<text x="1172" y="590" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">GRAPH / QUERIES / MEDIA / SUBSCRIPTIONS</text>
 <path d="M1320 416 V467" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
 <rect x="55" y="655" width="1490" height="120" rx="16" fill="#e9effb" stroke="#d4e0f5"/>
 <text x="80" y="689" fill="#5373ac" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FIRST-CLASS ACCESS CONTROL</text>
@@ -76,9 +76,9 @@
 <text x="410" y="731" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SASL_SSL • TLS • network policies • no direct user access to mixed-permission files</text>
 <text x="410" y="755" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400">Source grants expire server-side; backend outages fail closed.</text>
 <rect x="55" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="836" width="5" height="23" rx="2" fill="#527ce5"/>
-<text x="90" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Reference applications</text>
-<text x="77" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Metrics + video dashboard • workplace assistant</text>
-<text x="77" y="918" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">EXAMPLES BUILT ON THE PLATFORM APIS</text>
+<text x="90" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Included examples</text>
+<text x="77" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Slack/GitHub adapters • assistant • media demo</text>
+<text x="77" y="918" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">INPUT AND OUTPUT EXAMPLES — NOT PRODUCT SCOPE</text>
 <rect x="545" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="563" y="836" width="5" height="23" rx="2" fill="#8e73bd"/>
 <text x="580" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Read-only control plane</text>
 <text x="567" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Kubernetes inventory + jobs + query definitions</text>
