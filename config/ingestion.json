@@ -32,6 +32,20 @@
       "kind": "video",
       "topic": "cg.secure.video",
       "description": "Raw pipe-decodable video bytes (for example MPEG-TS); playlists and external file/network references are rejected."
+    },
+    {
+      "path": "/ingest/slack",
+      "name": "slack",
+      "kind": "json",
+      "topic": "cg.secure.slack",
+      "schema": "schemas/document-input.json"
+    },
+    {
+      "path": "/ingest/github",
+      "name": "github",
+      "kind": "json",
+      "topic": "cg.secure.github",
+      "schema": "schemas/document-input.json"
     }
   ]
 }

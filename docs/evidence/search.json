@@ -1,0 +1,13 @@
+{
+  "realGitHubResults": true,
+  "repositoryScope": true,
+  "configuredRanking": true,
+  "realSlackResults": true,
+  "newestSort": true,
+  "unauthorizedDenied": true,
+  "realDeepSeekAnswer": {
+    "blocks": 6,
+    "sources": 8,
+    "searches": 3
+  }
+}

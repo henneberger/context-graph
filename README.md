@@ -126,4 +126,8 @@ Local single-node storage and the development single PostgreSQL instance remain 
 
 ## Control plane and metrics
 
-Open [the read-only control plane](http://localhost:18088/control/) using the local admin identity. It reads live Kubernetes status, deployed API/query definitions and Prometheus metrics behind a separate SpiceDB platform grant. See [control-plane operations and metrics coverage](docs/control-plane.md).
+Open [the read-only control plane](http://localhost:18089/) using the local admin identity. It reads live Kubernetes status, deployed API/query definitions and Prometheus metrics behind a separate SpiceDB platform grant. See [control-plane operations and metrics coverage](docs/control-plane.md).
+
+## Workplace search
+
+Open [Context Search](http://localhost:18090/) for permissioned Slack and `MariHQ/mari` retrieval, freshness-aware BM25 ranking, and DeepSeek answers with source citations. [Setup, source coverage and security boundaries](docs/search.md).

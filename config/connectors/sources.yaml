@@ -1,0 +1,23 @@
+workspace: knowledge
+initial_backfill_days: null
+content_sync_minutes: 15
+acl_sync_minutes: 3
+acl_lease_minutes: 10
+providers:
+- github
+- slack
+github:
+  repositories:
+  - MariHQ/mari
+  kinds:
+  - issues
+  - pull_requests
+  - commits
+slack:
+  channels: all_accessible
+  include_threads: true
+identity_links:
+  github:10382790:
+  - admin
+  slack:T0B277CSRQD:U0B2PFT8LP3:
+  - admin

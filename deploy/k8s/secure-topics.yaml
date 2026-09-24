@@ -16,11 +16,11 @@ spec:
           args:
             - |
               K=/opt/kafka/bin
-              for topic in events images video metrics nodes edges errors; do
+              for topic in events images video slack github metrics nodes edges errors; do
                 "$K/kafka-topics.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --create --if-not-exists --topic "cg.secure.$topic" --partitions 6 --replication-factor 3 --config min.insync.replicas=2
               done
               acl() { "$K/kafka-acls.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --add "$@"; }
-              for topic in events images video; do
+              for topic in events images video slack github; do
                 acl --allow-principal User:ingestion --operation Write --operation Describe --topic "cg.secure.$topic"
                 acl --allow-principal User:processor --operation Read --operation Describe --topic "cg.secure.$topic"
               done

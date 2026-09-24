@@ -1,3 +1,5 @@
+use expiration
+
 definition user {}
 
 definition workspace {
@@ -8,12 +10,25 @@ definition workspace {
     permission view_schema = administrator + member
 }
 
+definition external_identity {
+    // Stable provider ID. Only trusted provisioning links real login subjects.
+    relation account: user
+}
+
+definition source {
+    relation reader: user:* with expiration | external_identity#account with expiration
+    permission view = reader
+}
+
 definition entity {
     // Trusted provisioning enforces exactly one workspace relation.
     relation workspace: workspace
     relation restricted: user:*
     relation reader: user
     relation writer: user
-    permission view = ((workspace->access - restricted) + reader + writer + workspace->manage) & workspace->access
+    relation imported: user:*
+    relation source: source
+    permission local_view = ((workspace->access - restricted) + reader + writer + workspace->manage) & workspace->access
+    permission view = ((local_view - imported) + source->view) & workspace->access
     permission ingest = (writer + workspace->manage) & workspace->access
 }

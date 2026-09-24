@@ -48,7 +48,7 @@ public final class IcebergQueries {
     if(extensions) try(Statement s=c.createStatement()) {
       String directory=System.getenv().getOrDefault("DUCKDB_EXTENSION_DIRECTORY",Path.of(System.getProperty("java.io.tmpdir"),"context-graph-duckdb-extensions").toString());
       s.execute("SET extension_directory='"+directory.replace("'","''")+"'");
-      s.execute("INSTALL iceberg; LOAD iceberg; INSTALL cache_httpfs FROM community; LOAD cache_httpfs;");
+      s.execute("INSTALL iceberg; LOAD iceberg; INSTALL cache_httpfs FROM community; LOAD cache_httpfs; INSTALL fts; LOAD fts;");
     } catch(SQLException e) {c.close();throw e;}
     return c;
   }

@@ -1,6 +1,6 @@
 # Read-only control plane
 
-Open **http://localhost:18088/control/** through the existing dashboard forward. The gear link on the data dashboard opens this view. The local `admin` identity has the separate platform grant; ordinary workspace members do not. Tokens stay in browser memory and expire after five minutes with the local issuer. Sign in again after expiry.
+Open **http://localhost:18089/** through a separate `kubectl --context docker-desktop -n context-graph port-forward svc/control-ui 18089:8080` forward. The gear link on the data dashboard opens this view. The local `admin` identity has the separate platform grant; ordinary workspace members do not. Tokens stay in browser memory and expire after five minutes with the local issuer. Sign in again after expiry.
 
 The control service uses its namespace-scoped Kubernetes service account to read Deployments, StatefulSets, Pods, Services, FlinkDeployments and ConfigMaps. It returns selected operational fields and the API, job and query definitions referenced by deployed workloads. It does not read Secrets, logs, pod execution endpoints, arbitrary URLs or arbitrary PromQL. SQL is displayed, not executed. Suspended jobs and scaled-down workloads remain visible.
 
@@ -17,6 +17,8 @@ permissions.write([permissions.relationship('workspace', 'platform', 'administra
 # Pass delete=True to revoke. The control service cannot call this mutation API.
 ```
 
+The control frontend is an independent Deployment and image, separate from the demo and search frontends. Its source ingestion table reads the connector status service.
+
 The browser polls every 15 seconds and explicitly marks collection failures. Metrics charts cover the last 15 minutes. The inventory timestamp describes collection time, not a transactionally consistent snapshot across Kubernetes resources. RBAC only grants `get` and `list` in `context-graph`.
 
 ## Metrics
@@ -27,8 +29,10 @@ Prometheus discovers each annotated pod's named `metrics` port in `context-graph
 |---|---|
 | Ingestion and query APIs | Dedicated internal port 9404: bounded HTTP status/route counters, latency histograms, JVM heap/threads/uptime; GraphQL error counter |
 | Development issuer and check-only authorization proxy | Internal port 9404: HTTP status counters, response-time summaries, process uptime and memory |
+| Temporal workers and search API | Prometheus client on 9404: provider/ingestion/search outcomes and latency |
+| Temporal server | Internal metrics forwarded through the restricted proxy on 9404 |
 | Control service | Prometheus client on 9404: status counters, request latency histogram, Python process metrics |
-| Dashboard | Nginx exporter on 9113 reading loopback-only `stub_status` |
+| Demo, control and search frontends | Nginx exporter on 9113 reading loopback-only `stub_status` |
 | Kafka | JMX exporter 1.6.0 on 9404: broker traffic/errors, replica/controller state, heap and threads |
 | Flink jobs | Bundled Flink 2.3 Prometheus reporter on 9249: records, operator/runtime and checkpoint metrics |
 | Flink operator | Native Prometheus reporter on 9405 |

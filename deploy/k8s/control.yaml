@@ -76,7 +76,7 @@ spec:
     spec:
       containers:
       - name: control
-        image: context-graph/control:observability-v2
+        image: context-graph/control:search-v1
         ports:
         - containerPort: 8443
           name: https

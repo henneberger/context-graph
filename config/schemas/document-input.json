@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entityId",
+    "documentId",
+    "source",
+    "sourceId",
+    "documentType",
+    "title",
+    "text",
+    "url",
+    "updatedAt",
+    "observedAt",
+    "deleted",
+    "eventTime"
+  ],
+  "properties": {
+    "entityId": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "documentId": {
+      "type": "string",
+      "maxLength": 512
+    },
+    "source": {
+      "enum": [
+        "slack",
+        "github"
+      ]
+    },
+    "sourceId": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "documentType": {
+      "enum": [
+        "message",
+        "issue",
+        "pull_request",
+        "commit"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 100000
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "container": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "eventTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  }
+}

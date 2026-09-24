@@ -196,7 +196,7 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
       - name: query
-        image: context-graph/query:observability-v1
+        image: context-graph/query:search-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
@@ -374,7 +374,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: dashboard
-        image: context-graph/dashboard:observability-v2
+        image: context-graph/dashboard:search-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

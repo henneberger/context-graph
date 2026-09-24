@@ -5,24 +5,20 @@
   "forgedDenied": true,
   "readOnly": true,
   "liveInventory": true,
-  "workloads": 18,
+  "workloads": 23,
   "configuredDefinitions": 4,
   "immediatePlatformRevocation": true,
   "targets": [
-    {
-      "job": "flink-kubernetes-operator",
-      "health": "up"
-    },
-    {
-      "job": "polaris",
-      "health": "up"
-    },
     {
       "job": "query",
       "health": "up"
     },
     {
-      "job": "spicedb-checks",
+      "job": "flink-kubernetes-operator",
+      "health": "up"
+    },
+    {
+      "job": "control-ui",
       "health": "up"
     },
     {
@@ -34,27 +30,27 @@
       "health": "up"
     },
     {
-      "job": "control",
+      "job": "temporal",
       "health": "up"
     },
     {
-      "job": "flink-kubernetes-operator",
+      "job": "search-ui",
       "health": "up"
     },
     {
-      "job": "spicedb",
-      "health": "up"
-    },
-    {
-      "job": "ingestion",
-      "health": "up"
-    },
-    {
-      "job": "context-secure-v1",
+      "job": "query",
       "health": "up"
     },
     {
       "job": "dashboard",
+      "health": "up"
+    },
+    {
+      "job": "identity",
+      "health": "up"
+    },
+    {
+      "job": "control-ui",
       "health": "up"
     },
     {
@@ -66,7 +62,63 @@
       "health": "up"
     },
     {
+      "job": "secure-kafka",
+      "health": "up"
+    },
+    {
       "job": "dashboard",
+      "health": "up"
+    },
+    {
+      "job": "ingestion",
+      "health": "up"
+    },
+    {
+      "job": "polaris",
+      "health": "up"
+    },
+    {
+      "job": "context-secure-v1",
+      "health": "up"
+    },
+    {
+      "job": "spicedb-checks",
+      "health": "up"
+    },
+    {
+      "job": "control",
+      "health": "up"
+    },
+    {
+      "job": "context-secure-v1",
+      "health": "up"
+    },
+    {
+      "job": "flink-kubernetes-operator",
+      "health": "up"
+    },
+    {
+      "job": "spicedb",
+      "health": "up"
+    },
+    {
+      "job": "connectors",
+      "health": "up"
+    },
+    {
+      "job": "search-ui",
+      "health": "up"
+    },
+    {
+      "job": "search-api",
+      "health": "up"
+    },
+    {
+      "job": "control",
+      "health": "up"
+    },
+    {
+      "job": "identity",
       "health": "up"
     },
     {
@@ -82,31 +134,15 @@
       "health": "up"
     },
     {
-      "job": "context-secure-v1",
-      "health": "up"
-    },
-    {
-      "job": "identity",
-      "health": "up"
-    },
-    {
-      "job": "identity",
-      "health": "up"
-    },
-    {
       "job": "ingestion",
       "health": "up"
     },
     {
-      "job": "query",
+      "job": "connectors",
       "health": "up"
     },
     {
-      "job": "secure-kafka",
-      "health": "up"
-    },
-    {
-      "job": "control",
+      "job": "search-api",
       "health": "up"
     },
     {
@@ -130,7 +166,10 @@
     "polaris": true,
     "spicedb": true,
     "dashboard": true,
-    "rustfs": true
+    "rustfs": true,
+    "connectors": true,
+    "search": true,
+    "temporal": true
   },
   "dashboardProxy": true
 }

@@ -130,7 +130,10 @@ class Inventory:
                 r=fetch('http://prometheus:9090/api/v1/query_range?'+urllib.parse.urlencode({'query':expression,'start':int(time.time())-900,'end':int(time.time()),'step':30}))
                 metrics[key]=r['data']['result']
         except Exception:errors.append('metrics unavailable')
-        return {'namespace':NS,'observedAt':time.time(),'readOnly':True,'errors':errors,'workloads':workloads,'pods':pods,'services':services,'flink':jobs,'definitions':definitions,'metrics':metrics}
+        connectors={}
+        try:connectors=fetch('http://connectors:9406/status')
+        except Exception:errors.append('connector status unavailable')
+        return {'connectors':connectors,'namespace':NS,'observedAt':time.time(),'readOnly':True,'errors':errors,'workloads':workloads,'pods':pods,'services':services,'flink':jobs,'definitions':definitions,'metrics':metrics}
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass

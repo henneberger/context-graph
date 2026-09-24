@@ -73,7 +73,10 @@ public final class QueryService {
       sdl.append(q.path("signature").asText()).append('\n');
       query.dataFetcher(entry.getKey(),env->CompletableFuture.supplyAsync(()->{try{
         if(q.has("sources"))return db.federate(sources,q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
-        var source=sources.get("source");return db.execute(source.table(),source.policy(),q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        var source=sources.get("source");
+        var rows=db.execute(source.table(),source.policy(),q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        if(q.path("engine").asText().equals("bm25")||q.path("engine").asText().equals("documents"))return DocumentSearch.execute(rows,env.getArguments(),q.path("engine").asText().equals("documents"),env.getGraphQlContext().get("security"),permissions,q.path("ranking"));
+        return rows;
       }catch(Exception e){throw new CompletionException(e);}},workers));
     });
     // Every discovered table gets a typed field; nested Iceberg types use the JSON scalar.

@@ -1,0 +1,521 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temporal-tls-proxy
+  namespace: context-graph
+data:
+  haproxy.cfg: "global\n  log stdout format raw local0 warning\n  maxconn 256\ndefaults\n\
+    \  log global\n  mode tcp\n  timeout connect 5s\n  timeout client 1h\n  timeout\
+    \ server 1h\nfrontend temporal\n  bind :7233 ssl crt /run/tls/server.pem ca-file\
+    \ /run/tls/ca.crt verify required alpn h2\n  default_backend temporal_local\n\
+    backend temporal_local\n  server temporal 127.0.0.1:17233 check\nfrontend metrics\n\
+    \  bind :9404\n  mode http\n  http-request deny unless { path /metrics } { method\
+    \ GET }\n  default_backend metrics_local\nbackend metrics_local\n  mode http\n\
+    \  server metrics 127.0.0.1:19404 check\n"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: temporal
+  namespace: context-graph
+spec:
+  serviceName: temporal
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal
+  template:
+    metadata:
+      labels:
+        app: temporal
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: temporal
+        image: temporalio/temporal:1.9.1
+        args:
+        - server
+        - start-dev
+        - --ip
+        - 127.0.0.1
+        - --port
+        - '17233'
+        - --namespace
+        - context-connectors
+        - --db-filename
+        - /data/temporal.db
+        - --headless
+        - --metrics-port
+        - '19404'
+        - --log-level
+        - warn
+        ports: []
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 768Mi
+        readinessProbe:
+          exec:
+            command:
+            - temporal
+            - operator
+            - namespace
+            - describe
+            - --address
+            - 127.0.0.1:17233
+            - --namespace
+            - context-connectors
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      - name: tls
+        image: haproxy:3.2-alpine
+        args:
+        - -f
+        - /etc/haproxy/haproxy.cfg
+        ports:
+        - name: grpc-tls
+          containerPort: 7233
+        - name: metrics
+          containerPort: 9404
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+        volumeMounts:
+        - name: tls
+          mountPath: /run/tls
+          readOnly: true
+        - name: proxy
+          mountPath: /etc/haproxy
+          readOnly: true
+      volumes:
+      - name: tls
+        secret:
+          secretName: temporal-security
+      - name: proxy
+        configMap:
+          name: temporal-tls-proxy
+      nodeSelector:
+        kubernetes.io/hostname: docker-desktop
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal
+  namespace: context-graph
+spec:
+  selector:
+    app: temporal
+  ports:
+  - name: service
+    port: 7233
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connectors
+  namespace: context-graph
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: connectors
+  template:
+    metadata:
+      labels:
+        app: connectors
+        context-graph-role: connectors
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: connectors
+        image: context-graph/connectors:search-v2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: service
+          containerPort: 9406
+        - name: metrics
+          containerPort: 9404
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 384Mi
+        readinessProbe:
+          httpGet:
+            path: /health/live
+            port: 9406
+            scheme: HTTP
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 9406
+            scheme: HTTP
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: tls
+          mountPath: /run/connectors
+          readOnly: true
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        env:
+        - name: CONNECTOR_DATABASE_URI
+          valueFrom:
+            secretKeyRef:
+              name: connectors-security
+              key: database-uri
+      volumes:
+      - name: tls
+        secret:
+          secretName: connectors-security
+      - name: config
+        configMap:
+          name: context-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connectors
+  namespace: context-graph
+spec:
+  selector:
+    app: connectors
+  ports:
+  - name: service
+    port: 9406
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-api
+  namespace: context-graph
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: search-api
+  template:
+    metadata:
+      labels:
+        app: search-api
+        context-graph-role: search-api
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: search-api
+        image: context-graph/search-api:search-v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: service
+          containerPort: 8443
+        - name: metrics
+          containerPort: 9404
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /health/live
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: tls
+          mountPath: /run/search
+          readOnly: true
+        env:
+        - name: SEARCH_WORKSPACE
+          value: knowledge
+        - name: DEEPSEEK_MODEL
+          value: deepseek-flash
+      volumes:
+      - name: tls
+        secret:
+          secretName: search-security
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-api
+  namespace: context-graph
+spec:
+  selector:
+    app: search-api
+  ports:
+  - name: service
+    port: 8443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-ui
+  namespace: context-graph
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: search-ui
+  template:
+    metadata:
+      labels:
+        app: search-ui
+        context-graph-role: search-ui
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9113'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: search-ui
+        image: context-graph/search-ui:search-v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: service
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: ca
+          mountPath: /etc/context-ca
+          readOnly: true
+      - name: metrics
+        image: nginx/nginx-prometheus-exporter:1.5.3
+        args:
+        - --nginx.scrape-uri=http://127.0.0.1:8082/nginx_status
+        ports:
+        - containerPort: 9113
+          name: metrics
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+      volumes:
+      - name: ca
+        configMap:
+          name: security-public-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-ui
+  namespace: context-graph
+spec:
+  selector:
+    app: search-ui
+  ports:
+  - name: service
+    port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-ui
+  namespace: context-graph
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: control-ui
+  template:
+    metadata:
+      labels:
+        app: control-ui
+        context-graph-role: control-ui
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9113'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: control-ui
+        image: context-graph/control-ui:search-v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: service
+          containerPort: 8080
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: ca
+          mountPath: /etc/context-ca
+          readOnly: true
+      - name: metrics
+        image: nginx/nginx-prometheus-exporter:1.5.3
+        args:
+        - --nginx.scrape-uri=http://127.0.0.1:8082/nginx_status
+        ports:
+        - containerPort: 9113
+          name: metrics
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+      volumes:
+      - name: ca
+        configMap:
+          name: security-public-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: control-ui
+  namespace: context-graph
+spec:
+  selector:
+    app: control-ui
+  ports:
+  - name: service
+    port: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: connectors
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: connectors
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: search-api
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: search-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: search-ui
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: search-ui
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: control-ui
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: control-ui

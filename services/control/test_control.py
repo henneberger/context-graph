@@ -35,7 +35,7 @@ class ControlTest(unittest.TestCase):
    return []
   inventory.listing=listing
   with patch.object(m,'fetch',side_effect=TimeoutError()):
-   snapshot=inventory.snapshot();self.assertNotIn('should-never-leak',m.json.dumps(snapshot));self.assertEqual(snapshot['errors'],['metrics unavailable'])
+   snapshot=inventory.snapshot();self.assertNotIn('should-never-leak',m.json.dumps(snapshot));self.assertEqual(snapshot['errors'],['metrics unavailable','connector status unavailable'])
  def test_rbac_no_mutations_secrets_logs_or_exec(self):
   resources=list(m.yaml.safe_load_all(m.Path('deploy/k8s/control.yaml').read_text()))
   role=next(r for r in resources if r['kind']=='Role')

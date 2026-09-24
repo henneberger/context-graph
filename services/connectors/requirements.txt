@@ -1,0 +1,6 @@
+temporalio==1.33.0
+requests==2.34.2
+psycopg[binary]==3.2.10
+PyYAML==6.0.3
+prometheus-client==0.22.1
+jsonschema==4.25.1

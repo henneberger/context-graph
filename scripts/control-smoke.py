@@ -3,7 +3,7 @@
 import argparse,json,sys,urllib.request,urllib.error,ssl,subprocess
 from pathlib import Path
 from kube_forward import service_forward
-p=argparse.ArgumentParser();p.add_argument('--context',default='docker-desktop');p.add_argument('--url',default='http://localhost:18088');p.add_argument('--output',default='docs/evidence/control-plane.json');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--context',default='docker-desktop');p.add_argument('--url',default='http://localhost:18089');p.add_argument('--output',default='docs/evidence/control-plane.json');a=p.parse_args()
 creds=json.loads(Path('.runtime/security/credentials.json').read_text());ca=ssl.create_default_context(cafile='.runtime/security/ca.crt')
 def request(url,body=None,token=None,method=None):
  headers={'Content-Type':'application/json'}
@@ -41,7 +41,7 @@ with service_forward(a.context,'prometheus',9090) as host:
  targets=prom('/api/v1/targets')['activeTargets'];out['targets']=[{'job':t['labels']['job'],'health':t['health']} for t in targets]
  assert targets and all(t['health']=='up' for t in targets),[(t['labels']['job'],t['health']) for t in targets]
  families=prom('/api/v1/label/__name__/values')
- expected={'api':'context_http_requests_total','flink':'flink_','kafka':'kafka_broker_','postgres':'pg_stat_database_','polaris':'http_server_requests_','spicedb':'spicedb_','dashboard':'nginx_http_requests_total','rustfs':'rustfs_'}
+ expected={'api':'context_http_requests_total','flink':'flink_','kafka':'kafka_broker_','postgres':'pg_stat_database_','polaris':'http_server_requests_','spicedb':'spicedb_','dashboard':'nginx_http_requests_total','rustfs':'rustfs_','connectors':'context_connector_','search':'context_search_','temporal':'temporal_' }
  out['metricFamilies']={k:any(n.startswith(prefix) for n in families) for k,prefix in expected.items()}
  assert all(out['metricFamilies'].values()),out['metricFamilies']
  status,body=request(a.url+'/control/api/snapshot',token=admin);assert status==200;out['dashboardProxy']=True
