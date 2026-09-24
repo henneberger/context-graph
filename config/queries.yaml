@@ -92,11 +92,13 @@ queries:
       recencyWeight: 0.35
       titleBoost: 0.2
       halfLifeDays:
+        document: 180
         message: 14
         pull_request: 45
         issue: 45
         commit: 90
       typeWeights:
+        document: 1.3
         message: 1.0
         pull_request: 1.15
         issue: 1.1

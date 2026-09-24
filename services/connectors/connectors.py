@@ -1,5 +1,5 @@
 """Source-native ACLs and resumable, idempotent document ingestion. No credentials in histories."""
-import datetime as dt,hashlib,json,os,time,uuid
+import base64,datetime as dt,hashlib,json,os,time,uuid
 from pathlib import Path
 from urllib.parse import urlparse
 import psycopg,requests,yaml
@@ -211,6 +211,17 @@ def make_document(source,identifier,kind,doc_id,title,text,url,updated,author=''
 def github_documents(api,source,identifier):
     root='repos/'+source['name'];cutoff=config().get('initial_backfill_days');params={'state':'all','sort':'updated','direction':'desc'}
     if cutoff:params['since']=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(days=cutoff)).isoformat()
+    if 'readme' in config()['github'].get('kinds',[]):
+        try:readme,_=api.get(root+'/readme')
+        except ProviderError as error:
+            if error.code!='http_404':raise
+        else:
+            if readme.get('encoding')!='base64' or readme.get('size',0)>100000:raise ProviderError('unsupported_readme')
+            body=base64.b64decode(readme['content']).decode('utf-8')
+            changes,_=api.get(root+'/commits',{'path':readme['path'],'per_page':1})
+            if not changes:raise ProviderError('readme_history_unavailable')
+            updated=changes[0]['commit']['committer']['date']
+            yield make_document(source,identifier,'document','github:'+source['external_id']+':readme',source['name']+' — README',body,readme['html_url'],updated,source['name'].split('/')[0])
     for issue in api.pages(root+'/issues',params):
         user=issue.get('user') or {};author=user.get('login','')
         if user.get('id'):register_identity('github',str(user['id']),author)

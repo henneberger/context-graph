@@ -1,0 +1,12 @@
+{
+  "question": "mari",
+  "statusMs": 35,
+  "paragraphMs": 9361,
+  "paragraphBeforeCompletion": true,
+  "paragraphs": 4,
+  "sourcePanel": true,
+  "followUp": true,
+  "mobile": true,
+  "logoutClearsAnswers": true,
+  "errors": []
+}
