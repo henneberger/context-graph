@@ -130,4 +130,4 @@ Open [the read-only control plane](http://localhost:18089/) using the local admi
 
 ## Workplace search
 
-Open [Context Search](http://localhost:18090/) for permissioned Slack and `MariHQ/mari` retrieval, freshness-aware BM25 ranking, and DeepSeek answers with source citations. [Setup, source coverage and security boundaries](docs/search.md).
+Open [Context Search](http://localhost:18088/search) for permissioned Slack and `MariHQ/mari` retrieval, freshness-aware BM25 ranking, and DeepSeek answers with source citations. [Setup, source coverage and security boundaries](docs/search.md).

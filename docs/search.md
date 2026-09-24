@@ -1,9 +1,9 @@
 # Permissioned workplace search
 
-Search runs at http://localhost:18090/ in its own React/shadcn frontend and search API. The read-only control frontend runs separately at http://localhost:18089/. Use the existing local admin login. Tokens stay in browser memory. To recreate the forwards:
+Search runs at http://localhost:18088/search in its own React/shadcn frontend and search API. The read-only control frontend runs separately at http://localhost:18089/. Use the existing local admin login. Tokens stay in browser memory. To recreate the forwards:
 
 ```sh
-kubectl --context docker-desktop -n context-graph port-forward svc/search-ui 18090:8080
+kubectl --context docker-desktop -n context-graph port-forward svc/dashboard 18088:8080
 kubectl --context docker-desktop -n context-graph port-forward svc/control-ui 18089:8080
 ```
 
