@@ -123,3 +123,7 @@ Readiness, surge replicas, graceful draining and disruption budgets support roll
 Local single-node storage and the development single PostgreSQL instance remain availability limits. Existing WebSockets/video uploads reconnect on replacement or expiry. Kafka/Iceberg commits are separate transactions. The deployment probes NetworkPolicy enforcement and, when needed, installs pinned firewall-only kube-router while preserving existing routing/CNI. It fails deployment if the enforcement recheck fails. Cluster/node administrators remain trusted; TLS, RBAC, storage replication, retention, compaction, backups and production identity operations need deployment-specific configuration.
 
 [Architecture](docs/architecture.md) · [Ingestion](services/ingestion/README.md) · [Processor](services/processor/README.md) · [Query](services/query/README.md)
+
+## Control plane and metrics
+
+Open [the read-only control plane](http://localhost:18088/control/) using the local admin identity. It reads live Kubernetes status, deployed API/query definitions and Prometheus metrics behind a separate SpiceDB platform grant. See [control-plane operations and metrics coverage](docs/control-plane.md).

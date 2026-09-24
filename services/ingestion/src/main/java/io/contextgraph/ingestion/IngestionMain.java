@@ -67,6 +67,7 @@ public final class IngestionMain {
         app.start(); Runtime.getRuntime().addShutdownHook(new Thread(app::stop));
     }
     private void start() throws Exception {
+        io.contextgraph.security.HttpMetrics.start();
         vertx.setPeriodic(1000, timer -> {
             if (!checkingKafka.compareAndSet(false,true) || draining.get()) return;
             workers.submit(() -> {
@@ -87,6 +88,8 @@ public final class IngestionMain {
     }
     private void handle(HttpServerRequest request) {
         String path = request.path();
+        long metricStart=System.nanoTime();
+        request.response().bodyEndHandler(v->io.contextgraph.security.HttpMetrics.observe(io.contextgraph.security.HttpMetrics.route(path),request.response().getStatusCode(),metricStart));
         if (path.equals("/health/live") || path.equals("/health/ready")) { request.response().setStatusCode(draining.get() || (path.equals("/health/ready") && !kafkaReady.get()) ? 503 : 200).end("ok"); return; }
         if ((request.method() == HttpMethod.GET || request.method() == HttpMethod.HEAD) && path.startsWith("/media/")) {
             workers.submit(() -> { try { serveMedia(request); } catch(Exception e) { reject(request,e); } }); return;

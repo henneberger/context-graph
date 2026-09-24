@@ -1,0 +1,25 @@
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+includeObjectNames:
+  - 'kafka.server:type=BrokerTopicMetrics,*'
+  - 'kafka.server:type=ReplicaManager,*'
+  - 'kafka.controller:type=KafkaController,*'
+  - 'kafka.network:type=RequestMetrics,*'
+  - 'java.lang:type=Memory'
+  - 'java.lang:type=Threading'
+rules:
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>Count'
+    name: kafka_broker_$1_total
+    type: COUNTER
+  - pattern: 'kafka.server<type=ReplicaManager, name=(.+)><>Value'
+    name: kafka_replica_$1
+    type: GAUGE
+  - pattern: 'kafka.controller<type=KafkaController, name=(.+)><>Value'
+    name: kafka_controller_$1
+    type: GAUGE
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>used'
+    name: kafka_jvm_heap_used_bytes
+    type: GAUGE
+  - pattern: 'java.lang<type=Threading><>ThreadCount'
+    name: kafka_jvm_threads
+    type: GAUGE

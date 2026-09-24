@@ -6,7 +6,7 @@ class RenderTest(unittest.TestCase):
     def test_query_change_does_not_restart_processing(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)/'config';shutil.copytree('config',root)
-            def names():return {r['metadata']['name'].split('-')[2]:r['metadata']['name'] for r in documents(root,'docker-desktop') if r['kind']=='ConfigMap'}
+            def names():return {r['metadata']['name'].split('-')[2]:r['metadata']['name'] for r in documents(root,'docker-desktop') if r['kind']=='ConfigMap' and r['metadata']['name'].startswith('context-config-')}
             before=names();p=root/'queries.yaml';p.write_text(p.read_text()+'\n# updated query\n');after=names()
             self.assertEqual(before['processor'],after['processor']);self.assertEqual(before['ingestion'],after['ingestion']);self.assertNotEqual(before['query'],after['query'])
     def test_all_config_mounts_preserve_schema_paths(self):
@@ -21,6 +21,6 @@ class RenderTest(unittest.TestCase):
                     cm=v['configMap']
                     if cm['name']=='security-public-ca':continue
                     self.assertIn(cm['name'],maps)
-                    for item in cm['items']:self.assertIn(item['key'],maps[cm['name']]['data'])
+                    for item in cm.get('items',[]):self.assertIn(item['key'],maps[cm['name']]['data'])
 
 if __name__=='__main__':unittest.main()

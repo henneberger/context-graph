@@ -1,142 +1,358 @@
 apiVersion: v1
 kind: Service
-metadata: {name: spicedb-postgres, namespace: context-graph}
-spec: {selector: {app: spicedb-postgres}, ports: [{port: 5432}]}
+metadata:
+  name: spicedb-postgres
+  namespace: context-graph
+spec:
+  selector:
+    app: spicedb-postgres
+  ports:
+  - port: 5432
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: spicedb-postgres, namespace: context-graph}
+metadata:
+  name: spicedb-postgres
+  namespace: context-graph
 spec:
   serviceName: spicedb-postgres
   replicas: 1
-  selector: {matchLabels: {app: spicedb-postgres}}
+  selector:
+    matchLabels:
+      app: spicedb-postgres
   template:
-    metadata: {labels: {app: spicedb-postgres}}
+    metadata:
+      labels:
+        app: spicedb-postgres
     spec:
       automountServiceAccountToken: false
       initContainers:
-        - name: tls-permissions
-          image: busybox:1.37
-          command: [sh, -ec, 'cp /input/server.crt /input/server.key /tls/; chown 999:999 /tls/*; chmod 0600 /tls/server.key']
-          volumeMounts: [{name: tls-input, mountPath: /input, readOnly: true}, {name: tls, mountPath: /tls}]
+      - name: tls-permissions
+        image: busybox:1.37
+        command:
+        - sh
+        - -ec
+        - cp /input/server.crt /input/server.key /tls/; chown 999:999 /tls/*; chmod
+          0600 /tls/server.key
+        volumeMounts:
+        - name: tls-input
+          mountPath: /input
+          readOnly: true
+        - name: tls
+          mountPath: /tls
       containers:
-        - name: postgres
-          image: postgres:17.6
-          args: [-c, ssl=on, -c, ssl_cert_file=/tls/server.crt, -c, ssl_key_file=/tls/server.key]
-          env:
-            - {name: POSTGRES_USER, value: spicedb}
-            - {name: POSTGRES_DB, value: spicedb}
-            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: spicedb-postgres, key: password}}}
-            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
-          ports: [{containerPort: 5432}]
-          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {memory: 384Mi}}
-          readinessProbe: {exec: {command: [pg_isready, -U, spicedb]}, periodSeconds: 5}
-          volumeMounts: [{name: postgres-data, mountPath: /var/lib/postgresql/data}, {name: tls, mountPath: /tls, readOnly: true}]
+      - name: postgres
+        image: postgres:17.6
+        args:
+        - -c
+        - ssl=on
+        - -c
+        - ssl_cert_file=/tls/server.crt
+        - -c
+        - ssl_key_file=/tls/server.key
+        env:
+        - name: POSTGRES_USER
+          value: spicedb
+        - name: POSTGRES_DB
+          value: spicedb
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: spicedb-postgres
+              key: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 384Mi
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - spicedb
+          periodSeconds: 5
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: tls
+          mountPath: /tls
+          readOnly: true
       volumes:
-        - {name: tls-input, secret: {secretName: spicedb-postgres, defaultMode: 256}}
-        - {name: tls, emptyDir: {}}
+      - name: tls-input
+        secret:
+          secretName: spicedb-postgres
+          defaultMode: 256
+      - name: tls
+        emptyDir: {}
   volumeClaimTemplates:
-    - metadata: {name: postgres-data}
-      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 2Gi}}}
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: spicedb-migrate-v1562, namespace: context-graph}
+metadata:
+  name: spicedb-migrate-v1562
+  namespace: context-graph
 spec:
   backoffLimit: 8
   template:
-    metadata: {labels: {app: spicedb-migrate}}
+    metadata:
+      labels:
+        app: spicedb-migrate
     spec:
       automountServiceAccountToken: false
       restartPolicy: OnFailure
-      securityContext: {runAsUser: 10004, fsGroup: 10004}
+      securityContext:
+        runAsUser: 10004
+        fsGroup: 10004
       containers:
-        - name: migrate
-          image: authzed/spicedb:v1.56.2
-          args: [migrate, head]
-          env:
-            - {name: SPICEDB_DATASTORE_ENGINE, value: postgres}
-            - {name: SPICEDB_DATASTORE_CONN_URI, valueFrom: {secretKeyRef: {name: spicedb-security, key: datastore-uri}}}
-          resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {memory: 256Mi}}
-          volumeMounts: [{name: secrets, mountPath: /run/spicedb, readOnly: true}]
-      volumes: [{name: secrets, secret: {secretName: spicedb-security, defaultMode: 288}}]
+      - name: migrate
+        image: authzed/spicedb:v1.56.2
+        args:
+        - migrate
+        - head
+        env:
+        - name: SPICEDB_DATASTORE_ENGINE
+          value: postgres
+        - name: SPICEDB_DATASTORE_CONN_URI
+          valueFrom:
+            secretKeyRef:
+              name: spicedb-security
+              key: datastore-uri
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
+        - name: secrets
+          mountPath: /run/spicedb
+          readOnly: true
+      volumes:
+      - name: secrets
+        secret:
+          secretName: spicedb-security
+          defaultMode: 288
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: spicedb, namespace: context-graph}
-spec: {selector: {app: spicedb}, ports: [{name: https, port: 8443}, {name: grpc, port: 50051}]}
+metadata:
+  name: spicedb
+  namespace: context-graph
+spec:
+  selector:
+    app: spicedb
+  ports:
+  - name: https
+    port: 8443
+  - name: grpc
+    port: 50051
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: spicedb, namespace: context-graph}
+metadata:
+  name: spicedb
+  namespace: context-graph
 spec:
   replicas: 2
-  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
-  selector: {matchLabels: {app: spicedb}}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: spicedb
   template:
-    metadata: {labels: {app: spicedb}}
+    metadata:
+      labels:
+        app: spicedb
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9090'
+        prometheus.io/path: /metrics
     spec:
       automountServiceAccountToken: false
-      securityContext: {runAsUser: 10004, fsGroup: 10004}
+      securityContext:
+        runAsUser: 10004
+        fsGroup: 10004
       containers:
-        - name: spicedb
-          image: authzed/spicedb:v1.56.2
-          args: [serve]
-          env:
-            - {name: SPICEDB_DATASTORE_ENGINE, value: postgres}
-            - {name: SPICEDB_DATASTORE_CONN_URI, valueFrom: {secretKeyRef: {name: spicedb-security, key: datastore-uri}}}
-            - {name: SPICEDB_GRPC_PRESHARED_KEY, valueFrom: {secretKeyRef: {name: spicedb-security, key: token}}}
-            - {name: SPICEDB_HTTP_ENABLED, value: 'true'}
-            - {name: SPICEDB_HTTP_ADDR, value: ':8443'}
-            - {name: SPICEDB_HTTP_TLS_CERT_PATH, value: /run/spicedb/server.crt}
-            - {name: SPICEDB_HTTP_TLS_KEY_PATH, value: /run/spicedb/server.key}
-            - {name: SPICEDB_GRPC_TLS_CERT_PATH, value: /run/spicedb/server.crt}
-            - {name: SPICEDB_GRPC_TLS_KEY_PATH, value: /run/spicedb/server.key}
-            - {name: SPICEDB_DISPATCH_UPSTREAM_ADDR, value: ''}
-            - {name: GOMEMLIMIT, value: 300MiB}
-          ports: [{containerPort: 8443}, {containerPort: 50051}]
-          resources: {requests: {cpu: 100m, memory: 96Mi}, limits: {memory: 384Mi}}
-          readinessProbe: {tcpSocket: {port: 50051}, periodSeconds: 5}
-          livenessProbe: {tcpSocket: {port: 50051}, initialDelaySeconds: 30}
-          volumeMounts: [{name: secrets, mountPath: /run/spicedb, readOnly: true}]
-          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
-      volumes: [{name: secrets, secret: {secretName: spicedb-security, defaultMode: 288}}]
+      - name: spicedb
+        image: authzed/spicedb:v1.56.2
+        args:
+        - serve
+        env:
+        - name: SPICEDB_DATASTORE_ENGINE
+          value: postgres
+        - name: SPICEDB_DATASTORE_CONN_URI
+          valueFrom:
+            secretKeyRef:
+              name: spicedb-security
+              key: datastore-uri
+        - name: SPICEDB_GRPC_PRESHARED_KEY
+          valueFrom:
+            secretKeyRef:
+              name: spicedb-security
+              key: token
+        - name: SPICEDB_HTTP_ENABLED
+          value: 'true'
+        - name: SPICEDB_HTTP_ADDR
+          value: :8443
+        - name: SPICEDB_HTTP_TLS_CERT_PATH
+          value: /run/spicedb/server.crt
+        - name: SPICEDB_HTTP_TLS_KEY_PATH
+          value: /run/spicedb/server.key
+        - name: SPICEDB_GRPC_TLS_CERT_PATH
+          value: /run/spicedb/server.crt
+        - name: SPICEDB_GRPC_TLS_KEY_PATH
+          value: /run/spicedb/server.key
+        - name: SPICEDB_DISPATCH_UPSTREAM_ADDR
+          value: ''
+        - name: GOMEMLIMIT
+          value: 300MiB
+        ports:
+        - containerPort: 8443
+        - containerPort: 50051
+        - containerPort: 9090
+          name: metrics
+        resources:
+          requests:
+            cpu: 100m
+            memory: 96Mi
+          limits:
+            memory: 384Mi
+        readinessProbe:
+          tcpSocket:
+            port: 50051
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 30
+        volumeMounts:
+        - name: secrets
+          mountPath: /run/spicedb
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: secrets
+        secret:
+          secretName: spicedb-security
+          defaultMode: 288
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata: {name: spicedb, namespace: context-graph}
-spec: {minAvailable: 1, selector: {matchLabels: {app: spicedb}}}
+metadata:
+  name: spicedb
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: spicedb
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: identity, namespace: context-graph}
-spec: {selector: {app: identity}, ports: [{name: https, port: 8443}]}
+metadata:
+  name: identity
+  namespace: context-graph
+spec:
+  selector:
+    app: identity
+  ports:
+  - name: https
+    port: 8443
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: identity, namespace: context-graph}
+metadata:
+  name: identity
+  namespace: context-graph
 spec:
   replicas: 2
-  selector: {matchLabels: {app: identity}}
-  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector:
+    matchLabels:
+      app: identity
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   template:
-    metadata: {labels: {app: identity}}
+    metadata:
+      labels:
+        app: identity
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+        prometheus.io/path: /metrics
     spec:
       automountServiceAccountToken: false
-      securityContext: {runAsUser: 10003, fsGroup: 10003}
+      securityContext:
+        runAsUser: 10003
+        fsGroup: 10003
       containers:
-        - name: identity
-          image: context-graph/identity:secure-v1
-          imagePullPolicy: IfNotPresent
-          ports: [{containerPort: 8443}]
-          env: [{name: OIDC_ISSUER, value: 'https://identity:8443'}, {name: OIDC_AUDIENCE, value: context-graph}]
-          resources: {requests: {cpu: 50m, memory: 48Mi}, limits: {memory: 128Mi}}
-          readinessProbe: {httpGet: {scheme: HTTPS, path: /health/live, port: 8443}, periodSeconds: 5}
-          volumeMounts: [{name: secrets, mountPath: /run/identity, readOnly: true}]
-          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
-      volumes: [{name: secrets, secret: {secretName: identity-security, defaultMode: 288}}]
+      - name: identity
+        image: context-graph/identity:observability-v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8443
+        - containerPort: 9404
+          name: metrics
+        env:
+        - name: OIDC_ISSUER
+          value: https://identity:8443
+        - name: OIDC_AUDIENCE
+          value: context-graph
+        resources:
+          requests:
+            cpu: 50m
+            memory: 48Mi
+          limits:
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /health/live
+            port: 8443
+          periodSeconds: 5
+        volumeMounts:
+        - name: secrets
+          mountPath: /run/identity
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: secrets
+        secret:
+          secretName: identity-security
+          defaultMode: 288
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata: {name: identity, namespace: context-graph}
-spec: {minAvailable: 1, selector: {matchLabels: {app: identity}}}
+metadata:
+  name: identity
+  namespace: context-graph
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: identity

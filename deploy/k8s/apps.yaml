@@ -18,14 +18,20 @@ spec:
       labels:
         app: ingestion
         context-graph-role: ingestion
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+        prometheus.io/path: /metrics
     spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: ingestion
-        image: context-graph/ingestion:lakehouse-v2
+        image: context-graph/ingestion:observability-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
+        - containerPort: 9404
+          name: metrics
         env:
         - name: CONFIG_PATH
           value: /app/config/ingestion.json
@@ -182,14 +188,20 @@ spec:
       labels:
         app: query
         context-graph-role: query
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+        prometheus.io/path: /metrics
     spec:
       terminationGracePeriodSeconds: 90
       containers:
       - name: query
-        image: context-graph/query:lakehouse-v3
+        image: context-graph/query:observability-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
+        - containerPort: 9404
+          name: metrics
         env:
         - name: QUERY_CONFIG
           value: /app/config/query.yaml
@@ -354,11 +366,15 @@ spec:
       labels:
         app: dashboard
         context-graph-role: dashboard
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9113'
+        prometheus.io/path: /metrics
     spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: dashboard
-        image: context-graph/dashboard:secure-v6
+        image: context-graph/dashboard:observability-v2
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -392,6 +408,19 @@ spec:
         - name: ca
           mountPath: /etc/context-ca
           readOnly: true
+      - name: nginx-metrics
+        image: nginx/nginx-prometheus-exporter:1.5.3
+        args:
+        - --nginx.scrape-uri=http://127.0.0.1:8082/nginx_status
+        ports:
+        - containerPort: 9113
+          name: metrics
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
       volumes:
       - name: ca
         configMap:

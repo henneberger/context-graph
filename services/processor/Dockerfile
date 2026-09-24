@@ -13,4 +13,5 @@ COPY config /app/config
 USER root
 RUN mkdir -p /opt/flink/plugins/s3-fs-hadoop && cp /opt/flink/opt/flink-s3-fs-hadoop-*.jar /opt/flink/plugins/s3-fs-hadoop/
 RUN mkdir -p /data/warehouse /data/checkpoints /data/savepoints && chown -R flink:flink /data
+# Flink 2.3 bundles the Prometheus reporter under plugins/metrics-prometheus.
 USER flink

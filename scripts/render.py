@@ -21,7 +21,7 @@ def documents(config_root=Path('config'), node=None, image_tag='secure-v6', api_
         configurations[role]=(config,selected)
     yield yaml.safe_load(Path('deploy/k8s/namespace.yaml').read_text())
     for config,_ in configurations.values(): yield config
-    for filename in ['storage.yaml','security-services.yaml','security-check-proxy.yaml','lakehouse.yaml','secure-kafka.yaml','secure-topics.yaml','apps.yaml','flink.yaml','network-policies.yaml']:
+    for filename in ['storage.yaml','security-services.yaml','security-check-proxy.yaml','lakehouse.yaml','secure-kafka.yaml','secure-topics.yaml','apps.yaml','flink.yaml','control.yaml','observability.yaml','network-policies.yaml','monitoring-policies.yaml']:
       for document in yaml.safe_load_all(Path('deploy/k8s',filename).read_text()):
         if not document: continue
         role='processor' if document['kind']=='FlinkDeployment' else document.get('metadata',{}).get('name','')
@@ -30,7 +30,7 @@ def documents(config_root=Path('config'), node=None, image_tag='secure-v6', api_
           if isinstance(value,dict):
             if 'configMap' in value and value['configMap'].get('name')=='context-config':
               value['configMap'].update(name=config['metadata']['name'],items=copy.deepcopy(items))
-            if isinstance(value.get('image'),str) and value['image'].startswith('context-graph/') and (image_tag!='secure-v6' or ':lakehouse-' not in value['image']):
+            if isinstance(value.get('image'),str) and value['image'].startswith('context-graph/') and (image_tag!='secure-v6' or not any(pin in value['image'] for pin in (':lakehouse-',':observability-'))):
               value['image']=value['image'].rsplit(':',1)[0]+':'+image_tag
             for child in value.values():visit(child)
           elif isinstance(value,list):

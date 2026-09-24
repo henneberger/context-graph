@@ -1,90 +1,195 @@
 apiVersion: v1
 kind: Service
-metadata: {name: secure-kafka-headless, namespace: context-graph}
+metadata:
+  name: secure-kafka-headless
+  namespace: context-graph
 spec:
   clusterIP: None
   publishNotReadyAddresses: true
-  selector: {app: secure-kafka}
-  ports: [{name: client, port: 9092}, {name: controller, port: 9093}]
+  selector:
+    app: secure-kafka
+  ports:
+  - name: client
+    port: 9092
+  - name: controller
+    port: 9093
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: secure-kafka, namespace: context-graph}
-spec: {selector: {app: secure-kafka}, ports: [{name: client, port: 9092}]}
+metadata:
+  name: secure-kafka
+  namespace: context-graph
+spec:
+  selector:
+    app: secure-kafka
+  ports:
+  - name: client
+    port: 9092
 ---
 apiVersion: apps/v1
 kind: StatefulSet
-metadata: {name: secure-kafka, namespace: context-graph}
+metadata:
+  name: secure-kafka
+  namespace: context-graph
 spec:
   serviceName: secure-kafka-headless
   replicas: 3
   podManagementPolicy: Parallel
-  selector: {matchLabels: {app: secure-kafka}}
+  selector:
+    matchLabels:
+      app: secure-kafka
   template:
-    metadata: {labels: {app: secure-kafka}}
+    metadata:
+      labels:
+        app: secure-kafka
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+        prometheus.io/path: /metrics
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 90
-      securityContext: {fsGroup: 1000}
+      securityContext:
+        fsGroup: 1000
       containers:
-        - name: kafka
-          image: apache/kafka:4.1.1
-          command: [/bin/bash, -ec]
-          args:
-            - |
-              export KAFKA_NODE_ID="${HOSTNAME##*-}"
-              export KAFKA_ADVERTISED_LISTENERS="CLIENT://${HOSTNAME}.secure-kafka-headless.context-graph.svc.cluster.local:9092"
-              export KAFKA_SSL_KEYSTORE_PASSWORD="$(cat /broker/tls-password)"
-              export KAFKA_SSL_KEY_PASSWORD="$KAFKA_SSL_KEYSTORE_PASSWORD"
-              export KAFKA_LISTENER_NAME_CLIENT_PLAIN_SASL_JAAS_CONFIG="$(cat /broker/jaas)"
-              exec /etc/kafka/docker/run
-          env:
-            - {name: CLUSTER_ID, value: U2VjdXJlQ29udGV4dEdyYQ}
-            - {name: KAFKA_PROCESS_ROLES, value: 'broker,controller'}
-            - {name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: '0@secure-kafka-0.secure-kafka-headless:9093,1@secure-kafka-1.secure-kafka-headless:9093,2@secure-kafka-2.secure-kafka-headless:9093'}
-            - {name: KAFKA_LISTENERS, value: 'CLIENT://:9092,CONTROLLER://:9093'}
-            - {name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: 'CLIENT:SASL_SSL,CONTROLLER:SSL'}
-            - {name: KAFKA_INTER_BROKER_LISTENER_NAME, value: CLIENT}
-            - {name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER}
-            - {name: KAFKA_SASL_ENABLED_MECHANISMS, value: PLAIN}
-            - {name: KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL, value: PLAIN}
-            - {name: KAFKA_SSL_KEYSTORE_LOCATION, value: /broker/server.p12}
-            - {name: KAFKA_SSL_KEYSTORE_TYPE, value: PKCS12}
-            - {name: KAFKA_SSL_TRUSTSTORE_LOCATION, value: /broker/kafka.truststore.p12}
-            - {name: KAFKA_SSL_TRUSTSTORE_TYPE, value: PKCS12}
-            - {name: KAFKA_SSL_TRUSTSTORE_PASSWORD, value: changeit}
-            - {name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH, value: required}
-            - {name: KAFKA_AUTHORIZER_CLASS_NAME, value: org.apache.kafka.metadata.authorizer.StandardAuthorizer}
-            - {name: KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND, value: 'false'}
-            - {name: KAFKA_SUPER_USERS, value: 'User:broker;User:admin;User:CN=kafka'}
-            - {name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: '3'}
-            - {name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: '3'}
-            - {name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: '2'}
-            - {name: KAFKA_DEFAULT_REPLICATION_FACTOR, value: '3'}
-            - {name: KAFKA_MIN_INSYNC_REPLICAS, value: '2'}
-            - {name: KAFKA_AUTO_CREATE_TOPICS_ENABLE, value: 'false'}
-            - {name: KAFKA_LOG_DIRS, value: /var/lib/kafka/data/logs}
-            - {name: KAFKA_HEAP_OPTS, value: '-Xms256m -Xmx384m'}
-          ports: [{containerPort: 9092}, {containerPort: 9093}]
-          resources: {requests: {cpu: 150m, memory: 384Mi}, limits: {memory: 768Mi}}
-          readinessProbe:
-            exec: {command: [/opt/kafka/bin/kafka-broker-api-versions.sh, --bootstrap-server, 'localhost:9092', --command-config, /app/secrets/kafka.properties]}
-            initialDelaySeconds: 15
-            periodSeconds: 15
-            timeoutSeconds: 10
-          livenessProbe: {tcpSocket: {port: 9092}, initialDelaySeconds: 90, periodSeconds: 20}
-          volumeMounts:
-            - {name: broker-data, mountPath: /var/lib/kafka/data}
-            - {name: broker-security, mountPath: /broker, readOnly: true}
-            - {name: admin-security, mountPath: /app/secrets, readOnly: true}
+      - name: kafka
+        image: context-graph/kafka:observability-v1
+        command:
+        - /bin/bash
+        - -ec
+        args:
+        - 'export KAFKA_NODE_ID="${HOSTNAME##*-}"
+
+          export KAFKA_ADVERTISED_LISTENERS="CLIENT://${HOSTNAME}.secure-kafka-headless.context-graph.svc.cluster.local:9092"
+
+          export KAFKA_SSL_KEYSTORE_PASSWORD="$(cat /broker/tls-password)"
+
+          export KAFKA_SSL_KEY_PASSWORD="$KAFKA_SSL_KEYSTORE_PASSWORD"
+
+          export KAFKA_LISTENER_NAME_CLIENT_PLAIN_SASL_JAAS_CONFIG="$(cat /broker/jaas)"
+
+          export KAFKA_OPTS="-javaagent:/opt/metrics/jmx.jar=9404:/opt/metrics/config.yaml"
+
+          exec /etc/kafka/docker/run
+
+          '
+        env:
+        - name: CLUSTER_ID
+          value: U2VjdXJlQ29udGV4dEdyYQ
+        - name: KAFKA_PROCESS_ROLES
+          value: broker,controller
+        - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+          value: 0@secure-kafka-0.secure-kafka-headless:9093,1@secure-kafka-1.secure-kafka-headless:9093,2@secure-kafka-2.secure-kafka-headless:9093
+        - name: KAFKA_LISTENERS
+          value: CLIENT://:9092,CONTROLLER://:9093
+        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+          value: CLIENT:SASL_SSL,CONTROLLER:SSL
+        - name: KAFKA_INTER_BROKER_LISTENER_NAME
+          value: CLIENT
+        - name: KAFKA_CONTROLLER_LISTENER_NAMES
+          value: CONTROLLER
+        - name: KAFKA_SASL_ENABLED_MECHANISMS
+          value: PLAIN
+        - name: KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+          value: PLAIN
+        - name: KAFKA_SSL_KEYSTORE_LOCATION
+          value: /broker/server.p12
+        - name: KAFKA_SSL_KEYSTORE_TYPE
+          value: PKCS12
+        - name: KAFKA_SSL_TRUSTSTORE_LOCATION
+          value: /broker/kafka.truststore.p12
+        - name: KAFKA_SSL_TRUSTSTORE_TYPE
+          value: PKCS12
+        - name: KAFKA_SSL_TRUSTSTORE_PASSWORD
+          value: changeit
+        - name: KAFKA_LISTENER_NAME_CONTROLLER_SSL_CLIENT_AUTH
+          value: required
+        - name: KAFKA_AUTHORIZER_CLASS_NAME
+          value: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+        - name: KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND
+          value: 'false'
+        - name: KAFKA_SUPER_USERS
+          value: User:broker;User:admin;User:CN=kafka
+        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+          value: '3'
+        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+          value: '3'
+        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+          value: '2'
+        - name: KAFKA_DEFAULT_REPLICATION_FACTOR
+          value: '3'
+        - name: KAFKA_MIN_INSYNC_REPLICAS
+          value: '2'
+        - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+          value: 'false'
+        - name: KAFKA_LOG_DIRS
+          value: /var/lib/kafka/data/logs
+        - name: KAFKA_HEAP_OPTS
+          value: -Xms256m -Xmx384m
+        - name: KAFKA_OPTS
+          value: ''
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        - containerPort: 9404
+          name: metrics
+        resources:
+          requests:
+            cpu: 150m
+            memory: 384Mi
+          limits:
+            memory: 768Mi
+        readinessProbe:
+          exec:
+            command:
+            - /opt/kafka/bin/kafka-broker-api-versions.sh
+            - --bootstrap-server
+            - localhost:9092
+            - --command-config
+            - /app/secrets/kafka.properties
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 90
+          periodSeconds: 20
+        volumeMounts:
+        - name: broker-data
+          mountPath: /var/lib/kafka/data
+        - name: broker-security
+          mountPath: /broker
+          readOnly: true
+        - name: admin-security
+          mountPath: /app/secrets
+          readOnly: true
       volumes:
-        - {name: broker-security, secret: {secretName: kafka-broker-security, defaultMode: 288}}
-        - {name: admin-security, secret: {secretName: security-admin, defaultMode: 288}}
+      - name: broker-security
+        secret:
+          secretName: kafka-broker-security
+          defaultMode: 288
+      - name: admin-security
+        secret:
+          secretName: security-admin
+          defaultMode: 288
   volumeClaimTemplates:
-    - metadata: {name: broker-data}
-      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 5Gi}}}
+  - metadata:
+      name: broker-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata: {name: secure-kafka, namespace: context-graph}
-spec: {minAvailable: 2, selector: {matchLabels: {app: secure-kafka}}}
+metadata:
+  name: secure-kafka
+  namespace: context-graph
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: secure-kafka

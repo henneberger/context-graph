@@ -1,0 +1,19 @@
+{
+  "desktopViewport": [
+    1500,
+    1100
+  ],
+  "mobileViewport": [
+    390,
+    844
+  ],
+  "javascriptErrors": [],
+  "horizontalOverflow": false,
+  "platformAdminLogin": true,
+  "workspaceMemberDenied": true,
+  "logoutClearsInventory": true,
+  "workloads": 18,
+  "flinkDeployments": 2,
+  "deployedDefinitions": 4,
+  "publicNginxStatusHTTP": 404
+}

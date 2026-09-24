@@ -30,6 +30,7 @@ PYDB
 kubectl --context "$context" apply -f .runtime/postgres.yaml
 kubectl --context "$context" -n context-graph rollout status statefulset/spicedb-postgres --timeout=180s
 "$python" scripts/deploy-lakehouse.py --context "$context" --node "$node"
+"$python" scripts/provision-control.py --context "$context"
 chart=.runtime/flink-operator-1.16.1.tgz
 if [[ ! -f "$chart" || ! -f "$chart.sha512" ]]; then
   curl -fsSL https://downloads.apache.org/flink/flink-kubernetes-operator-1.16.1/flink-kubernetes-operator-1.16.1-helm.tgz -o "$chart"
@@ -65,7 +66,7 @@ kubectl --context "$context" -n context-graph rollout status statefulset/spicedb
 kubectl --context "$context" -n context-graph wait --for=condition=complete job/spicedb-migrate-v1562 --timeout=300s
 kubectl --context "$context" -n context-graph rollout status statefulset/secure-kafka --timeout=300s
 kubectl --context "$context" -n context-graph wait --for=condition=complete job/secure-topics-v1 --timeout=180s
-for service in spicedb spicedb-checks identity ingestion query dashboard; do
+for service in spicedb spicedb-checks identity ingestion query control prometheus otel-collector postgres-exporter dashboard; do
   kubectl --context "$context" -n context-graph rollout status "deployment/$service" --timeout=300s
 done
 "$python" scripts/wait-flink.py --context "$context" --name context-secure-v1

@@ -45,6 +45,8 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,KeyError,TypeError):self.reply(400,{'error':'invalid_request'})
 
 if __name__=='__main__':
+    from http_metrics import instrument
+    instrument(Handler)
     server=ThreadingHTTPServer(('0.0.0.0',8443),Handler)
     server.daemon_threads=True
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.minimum_version=ssl.TLSVersion.TLSv1_2

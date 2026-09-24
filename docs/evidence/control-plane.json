@@ -1,0 +1,136 @@
+{
+  "liveReadOnlyRBAC": true,
+  "anonymousDenied": true,
+  "workspaceMemberDenied": true,
+  "forgedDenied": true,
+  "readOnly": true,
+  "liveInventory": true,
+  "workloads": 18,
+  "configuredDefinitions": 4,
+  "immediatePlatformRevocation": true,
+  "targets": [
+    {
+      "job": "flink-kubernetes-operator",
+      "health": "up"
+    },
+    {
+      "job": "polaris",
+      "health": "up"
+    },
+    {
+      "job": "query",
+      "health": "up"
+    },
+    {
+      "job": "spicedb-checks",
+      "health": "up"
+    },
+    {
+      "job": "spicedb",
+      "health": "up"
+    },
+    {
+      "job": "secure-kafka",
+      "health": "up"
+    },
+    {
+      "job": "control",
+      "health": "up"
+    },
+    {
+      "job": "flink-kubernetes-operator",
+      "health": "up"
+    },
+    {
+      "job": "spicedb",
+      "health": "up"
+    },
+    {
+      "job": "ingestion",
+      "health": "up"
+    },
+    {
+      "job": "context-secure-v1",
+      "health": "up"
+    },
+    {
+      "job": "dashboard",
+      "health": "up"
+    },
+    {
+      "job": "postgres-exporter",
+      "health": "up"
+    },
+    {
+      "job": "context-secure-v1",
+      "health": "up"
+    },
+    {
+      "job": "dashboard",
+      "health": "up"
+    },
+    {
+      "job": "spicedb-checks",
+      "health": "up"
+    },
+    {
+      "job": "polaris",
+      "health": "up"
+    },
+    {
+      "job": "secure-kafka",
+      "health": "up"
+    },
+    {
+      "job": "context-secure-v1",
+      "health": "up"
+    },
+    {
+      "job": "identity",
+      "health": "up"
+    },
+    {
+      "job": "identity",
+      "health": "up"
+    },
+    {
+      "job": "ingestion",
+      "health": "up"
+    },
+    {
+      "job": "query",
+      "health": "up"
+    },
+    {
+      "job": "secure-kafka",
+      "health": "up"
+    },
+    {
+      "job": "control",
+      "health": "up"
+    },
+    {
+      "job": "otel-collector",
+      "health": "up"
+    },
+    {
+      "job": "prometheus",
+      "health": "up"
+    },
+    {
+      "job": "rustfs",
+      "health": "up"
+    }
+  ],
+  "metricFamilies": {
+    "api": true,
+    "flink": true,
+    "kafka": true,
+    "postgres": true,
+    "polaris": true,
+    "spicedb": true,
+    "dashboard": true,
+    "rustfs": true
+  },
+  "dashboardProxy": true
+}

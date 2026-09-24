@@ -51,7 +51,7 @@ def write(items,delete=False):
     return api('/v1/relationships/write',{'updates':[{'operation':'OPERATION_DELETE' if delete else 'OPERATION_TOUCH','relationship':item} for item in items]})
 def bootstrap():
     api('/v1/schema/write',{'schema':Path('config/security/schema.zed').read_text()})
-    tuples=[relationship('workspace','demo','administrator','user','admin')]
+    tuples=[relationship('workspace','demo','administrator','user','admin'),relationship('workspace','platform','administrator','user','admin')]
     for name in ('alice','bob','producer'):tuples.append(relationship('workspace','demo','member','user',name))
     tuples.append(relationship('workspace','other','member','user','outsider'))
     for entity in ('alpha','beta','shared'):

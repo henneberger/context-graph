@@ -1,0 +1,298 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: context-graph
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus
+  namespace: context-graph
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus
+  namespace: context-graph
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: context-graph
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: context-graph
+data:
+  prometheus.yaml: "global:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n\
+    rule_files:\n- /etc/prometheus/alerts.yaml\nscrape_configs:\n- job_name: namespace-pods\n\
+    \  kubernetes_sd_configs:\n  - role: pod\n    namespaces:\n      names:\n    \
+    \  - context-graph\n  relabel_configs:\n  - source_labels:\n    - __meta_kubernetes_pod_annotation_prometheus_io_scrape\n\
+    \    action: keep\n    regex: 'true'\n  - source_labels:\n    - __meta_kubernetes_pod_container_port_name\n\
+    \    action: keep\n    regex: metrics\n  - source_labels:\n    - __meta_kubernetes_pod_phase\n\
+    \    action: keep\n    regex: Running\n  - source_labels:\n    - __meta_kubernetes_pod_annotation_prometheus_io_path\n\
+    \    target_label: __metrics_path__\n    regex: (.+)\n  - source_labels:\n   \
+    \ - __meta_kubernetes_pod_label_app\n    target_label: job\n    regex: (.+)\n\
+    \  - source_labels:\n    - __meta_kubernetes_pod_label_app_kubernetes_io_name\n\
+    \    target_label: job\n    regex: (.+)\n  - source_labels:\n    - __meta_kubernetes_pod_name\n\
+    \    target_label: pod\n  - source_labels:\n    - __meta_kubernetes_namespace\n\
+    \    target_label: namespace\n  sample_limit: 30000\n  label_limit: 40\n  scrape_timeout:\
+    \ 10s\n- job_name: prometheus\n  static_configs:\n  - targets:\n    - localhost:9090\n\
+    - job_name: rustfs\n  static_configs:\n  - targets:\n    - otel-collector:8889\n\
+    - job_name: otel-collector\n  static_configs:\n  - targets:\n    - otel-collector:8888\n"
+  alerts.yaml: "groups:\n- name: context-graph\n  rules:\n  - alert: MetricsTargetDown\n\
+    \    expr: up == 0\n    for: 2m\n    labels:\n      severity: warning\n    annotations:\n\
+    \      summary: Metrics target {{ $labels.job }} is unavailable\n  - alert: ApiServerErrors\n\
+    \    expr: sum(rate(context_http_requests_total{status=~\"5..\"}[5m])) > 0.1\n\
+    \    for: 2m\n    labels:\n      severity: warning\n    annotations:\n      summary:\
+    \ API server errors exceed 0.1 per second\n  - alert: PostgresUnavailable\n  \
+    \  expr: pg_up == 0\n    for: 1m\n    labels:\n      severity: critical\n    annotations:\n\
+    \      summary: PostgreSQL exporter cannot reach its database\n"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: context-graph
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: context-graph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        context-graph-role: prometheus
+        context-graph-control-plane: 'true'
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.14.0
+        ports:
+        - containerPort: 9090
+          name: http
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+        args:
+        - --config.file=/etc/prometheus/prometheus.yaml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --storage.tsdb.retention.size=4GB
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: data
+          mountPath: /prometheus
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+        runAsUser: 65534
+      serviceAccountName: prometheus
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: prometheus-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: context-graph
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - name: http
+    port: 9090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-config
+  namespace: context-graph
+data:
+  config.yaml: "receivers:\n  otlp:\n    protocols:\n      http:\n        endpoint:\
+    \ 0.0.0.0:4318\n      grpc:\n        endpoint: 0.0.0.0:4317\nprocessors:\n  memory_limiter:\n\
+    \    check_interval: 1s\n    limit_mib: 160\n    spike_limit_mib: 32\n  batch:\
+    \ {}\nexporters:\n  prometheus:\n    endpoint: 0.0.0.0:8889\n    resource_to_telemetry_conversion:\n\
+    \      enabled: true\nextensions:\n  health_check:\n    endpoint: 0.0.0.0:13133\n\
+    service:\n  extensions:\n  - health_check\n  pipelines:\n    metrics:\n      receivers:\n\
+    \      - otlp\n      processors:\n      - memory_limiter\n      - batch\n    \
+    \  exporters:\n      - prometheus\n  telemetry:\n    metrics:\n      readers:\n\
+    \      - pull:\n          exporter:\n            prometheus:\n              host:\
+    \ 0.0.0.0\n              port: 8888\n"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: context-graph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+        context-graph-role: otel-collector
+    spec:
+      containers:
+      - name: otel-collector
+        image: otel/opentelemetry-collector-contrib:0.161.0
+        ports:
+        - containerPort: 4318
+          name: otlp-http
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 8889
+          name: export
+        - containerPort: 8888
+          name: self
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        args:
+        - --config=/etc/otel/config.yaml
+        volumeMounts:
+        - name: config
+          mountPath: /etc/otel
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+      volumes:
+      - name: config
+        configMap:
+          name: otel-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: context-graph
+spec:
+  selector:
+    app: otel-collector
+  ports:
+  - name: otlp-http
+    port: 4318
+  - name: otlp-grpc
+    port: 4317
+  - name: export
+    port: 8889
+  - name: self
+    port: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: context-graph
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+        context-graph-role: postgres-exporter
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9187'
+    spec:
+      containers:
+      - name: postgres-exporter
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+        ports:
+        - containerPort: 9187
+          name: metrics
+        resources:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-monitor
+              key: uri
+        volumeMounts:
+        - name: ca
+          mountPath: /run/ca
+          readOnly: true
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65534
+        runAsUser: 65534
+      volumes:
+      - name: ca
+        configMap:
+          name: security-public-ca

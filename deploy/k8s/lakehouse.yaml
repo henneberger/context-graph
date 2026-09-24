@@ -241,6 +241,18 @@ spec:
             secretKeyRef:
               name: object-storage-security
               key: secret-key
+        - name: RUSTFS_OBS_ENDPOINT
+          value: http://otel-collector:4318
+        - name: RUSTFS_OBS_METRICS_EXPORT_ENABLED
+          value: 'true'
+        - name: RUSTFS_OBS_TRACES_EXPORT_ENABLED
+          value: 'false'
+        - name: RUSTFS_OBS_LOGS_EXPORT_ENABLED
+          value: 'false'
+        - name: RUSTFS_OBS_METER_INTERVAL
+          value: '15'
+        - name: RUSTFS_OBS_SERVICE_NAME
+          value: object-storage
         resources:
           requests:
             cpu: 100m
@@ -363,6 +375,10 @@ spec:
       labels:
         app: polaris
         context-graph-role: polaris
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '8182'
+        prometheus.io/path: /q/metrics
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -420,6 +436,8 @@ spec:
               key: secret-key
         ports:
         - containerPort: 8443
+        - containerPort: 8182
+          name: metrics
         resources:
           requests:
             cpu: 100m

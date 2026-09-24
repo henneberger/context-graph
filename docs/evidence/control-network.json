@@ -1,0 +1,4 @@
+{
+  "dashboardToRawPrometheus": "denied",
+  "readOnlyKubernetesRole": "verified by control-smoke.py"
+}

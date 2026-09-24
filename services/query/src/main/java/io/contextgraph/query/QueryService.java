@@ -94,12 +94,13 @@ public final class QueryService {
   ExecutionInput input(JsonObject body,SecurityContext context){return ExecutionInput.newExecutionInput().query(body.getString("query", "")).operationName(body.getString("operationName")).variables(body.getJsonObject("variables",new JsonObject()).getMap()).graphQLContext(Map.of("security",context)).build();}
   public void start(){
     HttpServerOptions httpOptions=serverOptions();
-    Router router=Router.router(vertx);router.get("/health/live").handler(c->c.response().end("ok"));router.get("/health/ready").handler(c->c.response().setStatusCode(!draining&&schemaHealthy&&live.ready()?200:503).end());
+    HttpMetrics.start();
+    Router router=Router.router(vertx);router.route().handler(c->{long began=System.nanoTime();c.addBodyEndHandler(v->HttpMetrics.observe(HttpMetrics.route(c.request().path()),c.response().getStatusCode(),began));c.next();});router.get("/health/live").handler(c->c.response().end("ok"));router.get("/health/ready").handler(c->c.response().setStatusCode(!draining&&schemaHealthy&&live.ready()?200:503).end());
     router.post("/graphql").handler(c->{c.request().pause();
       try {CompletableFuture.supplyAsync(()->access.authenticate(c.request().getHeader("Authorization"),c.request().getHeader("X-Workspace-Id")),workers).whenComplete((context,error)->vertx.runOnContext(v->{if(error!=null){c.response().putHeader("Connection","close").setStatusCode(authStatus(error)).end("Authentication or authorization failed");return;}c.put("security",context);c.next();c.request().resume();}));}
       catch(RejectedExecutionException e){c.response().setStatusCode(503).end();}
     });
-    router.post("/graphql").handler(BodyHandler.create().setBodyLimit(64*1024)).handler(c->{try{graph.executeAsync(input(c.body().asJsonObject(),c.get("security"))).whenComplete((result,error)->vertx.runOnContext(v->{if(error!=null)c.response().setStatusCode(500).end();else if(result.getData() instanceof Publisher<?>)c.response().setStatusCode(400).end("Use graphql-transport-ws for subscriptions");else c.response().putHeader("content-type","application/json").end(Json.encode(result.toSpecification()));}));}catch(Exception e){c.response().setStatusCode(400).end();}});
+    router.post("/graphql").handler(BodyHandler.create().setBodyLimit(64*1024)).handler(c->{try{graph.executeAsync(input(c.body().asJsonObject(),c.get("security"))).whenComplete((result,error)->vertx.runOnContext(v->{if(error!=null)c.response().setStatusCode(500).end();else if(result.getData() instanceof Publisher<?>)c.response().setStatusCode(400).end("Use graphql-transport-ws for subscriptions");else {if(!result.getErrors().isEmpty())HttpMetrics.event("graphql_error");c.response().putHeader("content-type","application/json").end(Json.encode(result.toSpecification()));}}));}catch(Exception e){c.response().setStatusCode(400).end();}});
     server=vertx.createHttpServer(httpOptions).webSocketHandler(this::socket).requestHandler(router);
     server.listen(port).onFailure(e->{e.printStackTrace();System.exit(1);});
     Runtime.getRuntime().addShutdownHook(new Thread(this::close));

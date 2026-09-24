@@ -4,7 +4,7 @@ metadata:
   name: context-secure-v1
   namespace: context-graph
 spec:
-  image: context-graph/processor:lakehouse-v3
+  image: context-graph/processor:observability-v1
   imagePullPolicy: IfNotPresent
   flinkVersion: v2_3
   serviceAccount: flink
@@ -37,6 +37,8 @@ spec:
     s3.path.style.access: 'true'
     s3.connection.ssl.enabled: 'true'
     kubernetes.operator.job.restart.failed: 'true'
+    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+    metrics.reporter.prom.port: '9249'
   jobManager:
     replicas: 2
     resources:
@@ -54,6 +56,10 @@ spec:
       labels:
         context-graph-role: processor
         context-graph-control-plane: 'true'
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9249'
+        prometheus.io/path: /metrics
     spec:
       securityContext:
         runAsUser: 9999
@@ -105,6 +111,9 @@ spec:
         - name: kafka-credentials
           mountPath: /app/secrets
           readOnly: true
+        ports:
+        - containerPort: 9249
+          name: metrics
       volumes:
       - name: config
         configMap:

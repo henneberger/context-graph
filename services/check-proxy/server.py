@@ -76,6 +76,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
+    from http_metrics import instrument
+    instrument(Handler)
     server = ThreadingHTTPServer(('0.0.0.0', 8443), Handler)
     server.daemon_threads = True
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
