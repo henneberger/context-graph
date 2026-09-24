@@ -1,0 +1,41 @@
+CONTEXT GRAPH — PROPRIETARY SOFTWARE
+
+Copyright (c) 2026 Daniel Henneberger. All rights reserved.
+
+This software and its original source code, documentation, and other original
+materials (the "Software") are proprietary. The Software is NOT free software
+and is NOT open-source software. No open-source or free-software license is
+granted.
+
+Except as required by applicable law or expressly authorized in a separate
+written agreement with the copyright holder, no permission is granted to use,
+run, copy, modify, create derivative works of, distribute, publish, sublicense,
+sell, offer as a service, or otherwise exploit the Software, in whole or in
+part. These restrictions apply to commercial and non-commercial purposes,
+including personal, educational, research, and evaluation use.
+
+Access to this repository, receipt of a copy, and the availability of source
+code do not themselves grant a license. Any license, including its scope,
+fees, and conditions, must be agreed separately in writing with the copyright
+holder. Rights expressly required by the applicable repository hosting
+platform's terms are unaffected.
+
+THIRD-PARTY MATERIALS
+
+Third-party software, dependencies, and materials remain the property of their
+respective owners and are governed by their own licenses. This notice does not
+replace those licenses, restrict rights granted by them, or claim ownership of
+third-party materials. See THIRD_PARTY_NOTICES.md and the notices supplied with
+the relevant components.
+
+DISCLAIMER
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+"AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS
+USE, WHETHER IN CONTRACT, TORT, OR OTHERWISE.
+
+For licensing inquiries, contact the copyright holder through the GitHub
+account https://github.com/henneberger.

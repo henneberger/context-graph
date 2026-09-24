@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1020" viewBox="0 0 1600 1020">
+<defs><linearGradient id="header" x2="1" y2="1"><stop stop-color="#182b46"/><stop offset="1" stop-color="#334f83"/></linearGradient><filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#1f3550" flood-opacity=".07"/></filter><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#869ab5"/></marker></defs>
+<rect width="1600" height="1020" fill="#f5f7fb"/><path d="M0 0 H1600 V184 H0 Z" fill="url(#header)"/>
+<text x="55" y="58" fill="#acbedb" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">CONTEXT GRAPH</text>
+<text x="55" y="109" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700">Knowledge in motion. Permissions throughout.</text>
+<text x="57" y="149" fill="#c5d2e7" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400">Local Kubernetes • configurable ingestion • durable lakehouse • source-grounded applications</text>
+<text x="55" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">01</text>
+<text x="85" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">COLLECT</text>
+<text x="315" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">02</text>
+<text x="345" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">INGEST</text>
+<text x="575" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">03</text>
+<text x="605" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">PROCESS</text>
+<text x="835" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">04</text>
+<text x="865" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">STORE</text>
+<text x="1095" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">05</text>
+<text x="1125" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">SERVE</text>
+<rect x="55" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="90" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Connected sources</text>
+<text x="77" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Slack + GitHub</text>
+<text x="77" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">JSON events, images, video</text>
+<text x="77" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Temporal schedules + retries</text>
+<text x="77" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SOURCE IDENTITIES + ACL SYNC</text>
+<rect x="315" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="333" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="350" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Vert.x ingestion</text>
+<text x="337" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">JSON-driven endpoints</text>
+<text x="337" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">JSON Schema validation</text>
+<text x="337" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">FFmpeg: keyframe HLS</text>
+<text x="337" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">WRITE ACCESS + TRUSTED LABELS</text>
+<rect x="575" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="593" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="610" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Kafka → Flink</text>
+<text x="597" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Separate endpoint topics</text>
+<text x="597" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Scoped graph projections</text>
+<text x="597" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Event-time aggregations</text>
+<text x="597" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">ICEBERG + KAFKA OUTPUTS</text>
+<rect x="835" y="262" width="225" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="853" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="870" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Polaris + RustFS</text>
+<text x="857" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Iceberg REST catalog</text>
+<text x="857" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Private S3 object storage</text>
+<text x="857" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Service credential vending</text>
+<text x="857" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">WAREHOUSE / MEDIA / RECOVERY</text>
+<rect x="1095" y="262" width="450" height="154" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1113" y="283" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="1130" y="301" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">GraphQL + DuckDB</text>
+<text x="1117" y="332" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Authorized materialization before SQL</text>
+<text x="1117" y="355" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">iceberg + cache_httpfs + per-user FTS</text>
+<text x="1117" y="378" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Federated queries • schemas • live subscriptions</text>
+<text x="1117" y="399" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">CURRENT PERMISSIONS CHECKED AGAIN</text>
+<path d="M280 334 H315" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M540 334 H575" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M800 334 H835" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M1060 334 H1095" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="55" y="467" width="340" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="488" width="5" height="23" rx="2" fill="#8e73bd"/>
+<text x="90" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Temporal workers</text>
+<text x="77" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">15-minute content sweeps</text>
+<text x="77" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">3-minute source ACL refresh; 10-minute leases</text>
+<text x="77" y="590" fill="#8e73bd" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SLACK / REPO PERMISSIONS ARE SOURCE-OWNED</text>
+<rect x="420" y="467" width="340" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="438" y="488" width="5" height="23" rx="2" fill="#3d9d91"/>
+<text x="455" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Durability &amp; streaming</text>
+<text x="442" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Flink incremental checkpoints + savepoints</text>
+<text x="442" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Kafka live outputs and operational errors</text>
+<text x="442" y="590" fill="#3d9d91" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">KAFKA BUFFERS INPUT DURING JOB UPGRADES</text>
+<rect x="785" y="467" width="340" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="803" y="488" width="5" height="23" rx="2" fill="#3d9d91"/>
+<text x="820" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Private media</text>
+<text x="807" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">PNG/JPEG originals + extracted metadata</text>
+<text x="807" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Closed-GOP video chunks and HLS playlists</text>
+<text x="807" y="590" fill="#3d9d91" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">PERMISSION-CHECKED PLAYLISTS, CHUNKS, RANGES</text>
+<rect x="1150" y="467" width="395" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1168" y="488" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="1185" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Workplace assistant</text>
+<text x="1172" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">DeepSeek + balanced lexical retrieval</text>
+<text x="1172" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Freshness ranking, streamed cited paragraphs</text>
+<text x="1172" y="590" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">RECHECK EVERY MODEL INPUT BEFORE RELEASE</text>
+<path d="M1320 416 V467" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="55" y="655" width="1490" height="120" rx="16" fill="#e9effb" stroke="#d4e0f5"/>
+<text x="80" y="689" fill="#5373ac" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FIRST-CLASS ACCESS CONTROL</text>
+<text x="80" y="727" fill="#2f4f7f" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">OIDC  +  SpiceDB</text>
+<text x="410" y="700" fill="#48678f" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400">Verified JWTs • workspace and entity grants • imported-source permissions</text>
+<text x="410" y="731" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SASL_SSL • TLS • network policies • no direct user access to mixed-permission files</text>
+<text x="410" y="755" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400">Source grants expire server-side; backend outages fail closed.</text>
+<rect x="55" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="836" width="5" height="23" rx="2" fill="#527ce5"/>
+<text x="90" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Applications</text>
+<text x="77" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Demo at /  •  Assistant at /search</text>
+<text x="77" y="918" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SEPARATE SERVICES, SHARED LOCAL ENTRY POINT</text>
+<rect x="545" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="563" y="836" width="5" height="23" rx="2" fill="#8e73bd"/>
+<text x="580" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Read-only control plane</text>
+<text x="567" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Kubernetes inventory + jobs + query definitions</text>
+<text x="567" y="918" fill="#8e73bd" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">PROMETHEUS METRICS + SOURCE SYNC STATUS</text>
+<rect x="1035" y="815" width="510" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1053" y="836" width="5" height="23" rx="2" fill="#b59153"/>
+<text x="1070" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Local development profile</text>
+<text x="1057" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Single storage node / database / Temporal server</text>
+<text x="1057" y="918" fill="#b59153" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">ROLLING APPS; INFRASTRUCTURE IS NOT FULLY HA</text>
+<text x="55" y="981" fill="#94a1b4" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400">Original Context Graph materials are proprietary • © 2026 Daniel Henneberger</text>
+<text x="1110" y="981" fill="#94a1b4" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400">Implementation overview · September 2026</text>
+</svg>
