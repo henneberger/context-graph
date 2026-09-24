@@ -1,6 +1,6 @@
 # Read-only control plane
 
-Open **http://localhost:18089/** through a separate `kubectl --context docker-desktop -n context-graph port-forward svc/control-ui 18089:8080` forward. The gear link on the data dashboard opens this view. The local `admin` identity has the separate platform grant; ordinary workspace members do not. Tokens stay in browser memory and expire after five minutes with the local issuer. Sign in again after expiry.
+Open the `/` route on the local control-plane port forward, created with `kubectl --context docker-desktop -n context-graph port-forward svc/control-ui 18089:8080` forward. The gear link on the data dashboard opens this view. The local `admin` identity has the separate platform grant; ordinary workspace members do not. Tokens stay in browser memory and expire after five minutes with the local issuer. Sign in again after expiry.
 
 The control service uses its namespace-scoped Kubernetes service account to read Deployments, StatefulSets, Pods, Services, FlinkDeployments and ConfigMaps. It returns selected operational fields and the API, job and query definitions referenced by deployed workloads. It does not read Secrets, logs, pod execution endpoints, arbitrary URLs or arbitrary PromQL. SQL is displayed, not executed. Suspended jobs and scaled-down workloads remain visible.
 

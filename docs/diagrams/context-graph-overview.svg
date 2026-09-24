@@ -2,8 +2,8 @@
 <defs><linearGradient id="header" x2="1" y2="1"><stop stop-color="#182b46"/><stop offset="1" stop-color="#334f83"/></linearGradient><filter id="shadow" x="-15%" y="-20%" width="130%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#1f3550" flood-opacity=".07"/></filter><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#869ab5"/></marker></defs>
 <rect width="1600" height="1020" fill="#f5f7fb"/><path d="M0 0 H1600 V184 H0 Z" fill="url(#header)"/>
 <text x="55" y="58" fill="#acbedb" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">CONTEXT GRAPH</text>
-<text x="55" y="109" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700">Knowledge in motion. Permissions throughout.</text>
-<text x="57" y="149" fill="#c5d2e7" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400">Local Kubernetes • configurable ingestion • durable lakehouse • source-grounded applications</text>
+<text x="55" y="109" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700">The context layer for your applications.</text>
+<text x="57" y="149" fill="#c5d2e7" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400">Multimodal ingestion • stream processing • lakehouse storage • permissioned application APIs</text>
 <text x="55" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">01</text>
 <text x="85" y="233" fill="#526888" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">COLLECT</text>
 <text x="315" y="233" fill="#7990b1" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">02</text>
@@ -64,10 +64,10 @@
 <text x="807" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Closed-GOP video chunks and HLS playlists</text>
 <text x="807" y="590" fill="#3d9d91" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">PERMISSION-CHECKED PLAYLISTS, CHUNKS, RANGES</text>
 <rect x="1150" y="467" width="395" height="140" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="1168" y="488" width="5" height="23" rx="2" fill="#527ce5"/>
-<text x="1185" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Workplace assistant</text>
-<text x="1172" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">DeepSeek + balanced lexical retrieval</text>
-<text x="1172" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Freshness ranking, streamed cited paragraphs</text>
-<text x="1172" y="590" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">RECHECK EVERY MODEL INPUT BEFORE RELEASE</text>
+<text x="1185" y="506" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Build on the platform</text>
+<text x="1172" y="537" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Your applications consume authorized APIs</text>
+<text x="1172" y="560" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Example: cited search and assistant products</text>
+<text x="1172" y="590" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">GRAPH / QUERIES / SEARCH / MEDIA / SUBSCRIPTIONS</text>
 <path d="M1320 416 V467" fill="none" stroke="#869ab5" stroke-width="2" marker-end="url(#arrow)"/>
 <rect x="55" y="655" width="1490" height="120" rx="16" fill="#e9effb" stroke="#d4e0f5"/>
 <text x="80" y="689" fill="#5373ac" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">FIRST-CLASS ACCESS CONTROL</text>
@@ -76,9 +76,9 @@
 <text x="410" y="731" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400">SASL_SSL • TLS • network policies • no direct user access to mixed-permission files</text>
 <text x="410" y="755" fill="#6781a3" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="400">Source grants expire server-side; backend outages fail closed.</text>
 <rect x="55" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="73" y="836" width="5" height="23" rx="2" fill="#527ce5"/>
-<text x="90" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Applications</text>
-<text x="77" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Demo at /  •  Assistant at /search</text>
-<text x="77" y="918" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">SEPARATE SERVICES, SHARED LOCAL ENTRY POINT</text>
+<text x="90" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Reference applications</text>
+<text x="77" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Metrics + video dashboard • workplace assistant</text>
+<text x="77" y="918" fill="#527ce5" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">EXAMPLES BUILT ON THE PLATFORM APIS</text>
 <rect x="545" y="815" width="465" height="120" rx="14" fill="white" stroke="#dfe6f0" filter="url(#shadow)"/><rect x="563" y="836" width="5" height="23" rx="2" fill="#8e73bd"/>
 <text x="580" y="854" fill="#263d5c" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">Read-only control plane</text>
 <text x="567" y="885" fill="#536681" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400">Kubernetes inventory + jobs + query definitions</text>

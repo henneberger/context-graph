@@ -1,16 +1,18 @@
 # Context Graph
 
-**A permissioned streaming knowledge platform with multimodal ingestion, a queryable context graph, and a source-grounded workplace assistant.**
+**Infrastructure for building applications on a permissioned, continuously updated context graph.**
 
 > **Proprietary software — not free software and not open source.** Copyright © 2026 Daniel Henneberger. All rights reserved. Use, modification, hosting, and redistribution require a separate written license. See [LICENSE](LICENSE). Third-party components retain their own licenses.
 
-Context Graph turns JSON events, images, video, Slack conversations, and GitHub activity into a shared, permissioned data foundation. Applications consume it through authenticated APIs rather than gaining direct access to the underlying files. A conversational assistant, a metrics/video demo, and a read-only operations console demonstrate how to build on that foundation.
+Context Graph is a platform for ingesting multimodal data, processing streams, persisting a lakehouse, and exposing a permissioned context graph to applications. It combines **Vert.x, Kafka, Flink, Iceberg, Polaris, DuckDB, and SpiceDB** into a configurable foundation that other products can build on.
 
-[Screenshots](#screenshots) · [Architecture](#architecture) · [Local setup](#local-setup) · [Security](#security-and-permissions) · [Search](#workplace-search-and-assistant) · [Configuration](#configuration) · [Operations](#operations-and-deployment) · [Limitations](#current-scope-and-limitations) · [License](#license)
+Applications use the platform's query, graph, search, media, and subscription APIs. The platform handles ingestion, schema validation, temporal processing, storage, source identity mapping, authorization, and operational visibility. A Glean-style assistant and a metrics/video dashboard are included as **reference applications built on these capabilities**.
 
-![Context workplace assistant](docs/search-home.png)
+[Architecture](#architecture) · [Build applications](#building-applications-on-the-graph) · [Capabilities](#platform-capabilities) · [Security](#security-and-permissions) · [Configuration](#configuration) · [Operations](#operations-and-deployment) · [Local setup](#local-setup) · [License](#license)
 
-## What is implemented
+[![Context Graph platform architecture](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
+
+## Platform capabilities
 
 | Capability | Implementation |
 |---|---|
@@ -23,37 +25,13 @@ Context Graph turns JSON events, images, video, Slack conversations, and GitHub 
 | Serving API | Generated/configured GraphQL fields, federated DuckDB queries, schema discovery, Kafka-backed subscriptions |
 | Authorization | Verified OIDC identities, SpiceDB workspace/entity/source permissions, fail-closed checks |
 | Source connectors | Temporal schedules for Slack and a GitHub repository allowlist, source identities, ACL synchronization, deletion handling |
-| Workplace assistant | Lexical BM25 plus freshness weighting, streamed cited paragraphs, follow-ups, and source inspection |
+| Search capability | Permission-filtered lexical BM25, freshness weighting, and document lookup for downstream applications |
 | Operations | Separate read-only control frontend/API, Kubernetes inventory, source status, Prometheus metrics |
 | Validation | Unit tests, real-service security checks, source-permission expiry checks, media tests, and browser evidence |
 
-This is a functioning local Kubernetes implementation, not a claim of production certification or complete Glean feature parity. The graph currently contains entities, labeled events, configurable nodes/edges, source relationships, and user access relationships. Automatic extraction of a complete organizational ontology is future work.
-
-## Screenshots
-
-The screenshots show the running application and local demonstration data, not design mockups.
-
-**Cited workplace answers** — a real answer about Mari, grounded in repository evidence.
-
-![Workplace assistant with a cited Mari answer](docs/search-answer.png)
-
-<details>
-<summary>Metrics, context graph, and keyframe-aligned video demo</summary>
-
-![Authenticated metrics and video demonstration](docs/dashboard-secure.png)
-
-</details>
-
-<details>
-<summary>Read-only control plane: workloads, jobs, sources, queries, and metrics</summary>
-
-![Read-only Kubernetes control plane](docs/control-plane.png)
-
-</details>
+The platform is implemented and exercised on local Kubernetes. Its current deployment profile has the availability and scale limits described below. The graph currently contains entities, labeled events, configurable nodes/edges, source relationships, and user access relationships. Automatic extraction of a complete organizational ontology is future work.
 
 ## Architecture
-
-[![Context Graph architecture overview](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
 
 [Download the SVG](docs/diagrams/context-graph-overview.svg) · [PNG](docs/diagrams/context-graph-overview.png)
 
@@ -95,17 +73,21 @@ flowchart TB
     V --> M
     I --> M
   end
-  subgraph Serving
+  subgraph Platform_serving[Platform serving APIs]
     Q[Vert.x GraphQL serving API]
     D[DuckDB: iceberg + cache_httpfs + fts]
-    SA[Search / assistant API]
-    LLM[DeepSeek]
-    UI[Workplace assistant]
-    DEMO[Metrics / video demo]
     Q --> D
     D --> P
     D --> W
     LIVE --> Q
+  end
+  subgraph Reference_applications[Reference applications and extension points]
+    APP[Your applications]
+    SA[Example assistant API]
+    LLM[DeepSeek]
+    UI[Example assistant UI]
+    DEMO[Example metrics / video dashboard]
+    Q --> APP
     Q --> SA
     SA --> LLM
     SA --> UI
@@ -144,7 +126,7 @@ The [detailed architecture documentation](docs/architecture.md), [lakehouse desi
 3. Kafka isolates endpoint streams. Flink consumes labeled events, applies configured transformations, creates graph projections, and calculates temporal metrics.
 4. Flink writes Iceberg tables and optional Kafka outputs. Iceberg lives in RustFS; Polaris supplies catalog operations and service credential vending.
 5. The serving API checks the caller's permissions, materializes authorized source rows, then runs configured SQL. Kafka feeds authorized live subscriptions.
-6. The assistant retrieves only authorized documents and rechecks every model input before releasing each complete cited paragraph.
+6. Downstream applications use these APIs to build products. The included assistant demonstrates authorized retrieval and checks every model input before releasing each cited paragraph.
 
 ### Technology profile
 
@@ -164,6 +146,50 @@ These are pinned repository versions, not an assertion that every component is t
 | Telemetry | Prometheus, service metrics, exporters, OpenTelemetry collector |
 
 The Kafka/Iceberg connector compatibility checks are application-specific evidence for this Flink profile. A custom connector fork is not required by the current implementation; schema handling is implemented at the application boundary.
+
+## Building applications on the graph
+
+The stable integration boundary is the serving API. Build new services and frontends on its authorized results rather than bypassing it with direct access to mixed-permission lakehouse files.
+
+| Extension point | How to build on it |
+|---|---|
+| New data sources | Add an authenticated producer or connector and configure endpoint/topic/schema mappings |
+| Stream transformations | Extend job configuration or processor code while preserving resource labels and scoped aggregation keys |
+| Graph relationships | Configure node/edge projections and add domain-specific relationships |
+| Durable application queries | Register Iceberg sources and named, parameterized GraphQL/SQL views |
+| Live application state | Consume authorized GraphQL subscriptions backed by Kafka outputs |
+| Search and AI products | Retrieve authorized documents, preserve source references, and recheck access before returning derived answers |
+| Media applications | Use protected image, playlist, chunk, and range endpoints |
+
+Use `/graphql` with a verified bearer token and `X-Workspace-Id`. The generated schema exposes configured metrics, nodes, edges, media, schemas, federated fields, and document search. For example:
+
+```graphql
+query {
+  metricTotals(metric: "value") {
+    metric
+    sample_count
+    sum_value
+  }
+}
+```
+
+The sum is calculated from authorized contributors. Add named queries and registered sources in YAML to create additional application views. Federated queries authorize each registered Iceberg input separately before joining them. Schema discovery does not expose raw storage credentials or arbitrary physical metadata paths.
+
+For live data, initialize a `graphql-transport-ws` connection with:
+
+```json
+{
+  "type": "connection_init",
+  "payload": {
+    "authorization": "Bearer <JWT>",
+    "workspaceId": "demo"
+  }
+}
+```
+
+Then subscribe to configured fields such as `metricUpdated`. Kafka streams supply live results; Iceberg supplies durable queryable state. Cross-table snapshots and Kafka/Iceberg transactions are not globally atomic.
+
+Useful next applications include project activity views, ownership/relationship exploration, change summaries, and decision timelines. Rich automatic links between people, projects, decisions, conversations, and code changes are an extension of the current foundation, not something this README claims is already complete.
 
 ## Local setup
 
@@ -250,7 +276,7 @@ python scripts/deploy-search.py --context "$KUBE_CONTEXT" --node "$STORAGE_NODE"
 
 The fixture creates the demo workspace and its grants; the search release installs the imported-source schema and broker topic/ACL provisioning. Source workers establish the configured knowledge-workspace identities and source grants. Administrative provisioning is distinct from ingestion: generators never grant themselves permissions.
 
-### 5. Open the applications
+### 5. Open the local reference applications
 
 Run each forward in its own terminal:
 
@@ -262,11 +288,11 @@ kubectl --context "$KUBE_CONTEXT" -n context-graph \
   port-forward service/control-ui 18089:8080
 ```
 
-| Application | Address | Access |
+| Application | Route after port forwarding | Access |
 |---|---|---|
-| Metrics/video demo | http://localhost:18088/ | Select `demo`; use a provisioned demo identity |
-| Workplace assistant | http://localhost:18088/search | Existing local credentials; knowledge-workspace access required |
-| Read-only control plane | http://localhost:18089/ | Separate platform administrator permission |
+| Metrics/video demo | `/` on the dashboard forward | Select `demo`; use a provisioned demo identity |
+| Workplace assistant | `/search` on the dashboard forward | Existing local credentials; knowledge-workspace access required |
+| Read-only control plane | `/` on the control-ui forward | Separate platform administrator permission |
 
 Local passwords are generated in `.runtime/security/credentials.json`; there is no checked-in default password. The `admin` account has the local demo/platform grants, and the configured source identity links grant its knowledge access. Alice/Bob demonstrate disjoint demo access; they do not automatically gain knowledge-workspace access.
 
@@ -300,9 +326,9 @@ PostgreSQL persists SpiceDB and Polaris state and connector bookkeeping in separ
 
 See [security architecture](docs/security-architecture.md), [network boundaries](docs/network-security.md), and [source authorization](docs/search.md) for trust assumptions, exact contracts, and deployment-specific limits.
 
-## Workplace search and assistant
+## Reference application: workplace search and assistant
 
-The default `/search` experience is a conversation: ask a question, see live retrieval activity, receive cited paragraphs as they are generated, inspect sources in a side panel, and ask follow-ups. Traditional document search is a separate view.
+The included Glean-style reference application at the `/search` route demonstrates the platform’s retrieval and permission APIs. Its experience is a conversation: ask a question, see live retrieval activity, receive cited paragraphs as they are generated, inspect sources in a side panel, and ask follow-ups. Traditional document search is a separate view.
 
 ### Retrieval and ranking
 
@@ -356,38 +382,6 @@ aggregations:
 ```
 
 Event-time windows depend on advancing watermarks. A fully idle input does not necessarily close its last window because wall-clock time passed. Aggregation scope always includes the authorization boundary.
-
-## Building applications on the graph
-
-Use `/graphql` with a verified bearer token and `X-Workspace-Id`. The generated schema exposes configured metrics, nodes, edges, media, schemas, federated fields, and document search. For example:
-
-```graphql
-query {
-  metricTotals(metric: "value") {
-    metric
-    sample_count
-    sum_value
-  }
-}
-```
-
-The sum is calculated from authorized contributors. Add named queries and registered sources in YAML to create additional application views. Federated queries authorize each registered Iceberg input separately before joining them. Schema discovery does not expose raw storage credentials or arbitrary physical metadata paths.
-
-For live data, initialize a `graphql-transport-ws` connection with:
-
-```json
-{
-  "type": "connection_init",
-  "payload": {
-    "authorization": "Bearer <JWT>",
-    "workspaceId": "demo"
-  }
-}
-```
-
-Then subscribe to configured fields such as `metricUpdated`. Kafka streams supply live results; Iceberg supplies durable queryable state. Cross-table snapshots and Kafka/Iceberg transactions are not globally atomic.
-
-Useful next applications include project activity views, ownership/relationship exploration, change summaries, and decision timelines. Rich automatic links between people, projects, decisions, conversations, and code changes are an extension of the current foundation, not something this README claims is already complete.
 
 ## Generators and media
 
@@ -482,6 +476,32 @@ python scripts/security-smoke.py --help
 `--ask` makes a real DeepSeek request. The full security smoke uses fixture writes and revocations; review its options and [security validation](docs/security-validation.md) before running it against shared data. Some development scripts default to `docker-desktop`; inspect their options before targeting another cluster.
 
 Recorded evidence includes [streamed Mari answers](docs/evidence/streaming-search.json), [assistant browser checks](docs/evidence/assistant-browser.json), [source lease expiry](docs/evidence/source-permissions.json), [pipeline security](docs/evidence/search-pipeline-security.json), and [control-plane checks](docs/evidence/control-plane.json). These record particular runs, not continuous guarantees or general capacity benchmarks.
+
+## Platform and reference-application screenshots
+
+These screenshots show the running platform and included reference applications with demonstration data.
+
+**Platform control plane** — infrastructure inventory, Flink jobs, source status, query definitions, and metrics.
+
+<details>
+<summary>View the read-only platform control plane</summary>
+
+![Context Graph platform control plane](docs/control-plane.png)
+
+</details>
+
+**Multimodal reference application** — graph relationships, temporal metrics, and protected keyframe-aligned video.
+
+![Multimodal reference application built on Context Graph](docs/dashboard-secure.png)
+
+<details>
+<summary>Glean-style reference application built on the platform</summary>
+
+The assistant demonstrates permissioned retrieval, streamed answers, and citations. It is one application on the platform.
+
+![Example assistant using the Context Graph APIs](docs/search-answer.png)
+
+</details>
 
 ## Repository layout
 
