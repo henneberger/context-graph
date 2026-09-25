@@ -15,4 +15,4 @@ The release workflow verifies running jobs, a completed checkpoint, and API roll
 
 For a compatible existing job, retained checkpoints and native savepoints provide recovery state. Stateful upgrades must explicitly account for source positions, schema compatibility, operator state, and output semantics. API readiness alone is not a catch-up or equivalence check.
 
-The JSON Schema/VARIANT replacement is a clean reset. Its job uses a fresh HA identity and does not restore the removed fixed-table topology. See [lakehouse reset](lakehouse.md) for the explicit destructive command. No migration or compatibility adapter is supplied for that old model.
+For local development, the [runtime reset command](lakehouse.md#configuration-and-operations) purges application data and starts jobs with fresh recovery state. Use checkpoints or savepoints when preserving processing state is required.

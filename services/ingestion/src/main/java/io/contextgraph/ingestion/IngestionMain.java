@@ -152,11 +152,14 @@ public final class IngestionMain {
         if(!value.isTextual())throw new IllegalArgumentException("Bound resource/time field must be a string");
         return value.textValue();
     }
-    private JsonObject event(Endpoint endpoint, Authorized auth, Object payload) throws Exception {
-        String now = Instant.now().toString(); String eventTime = endpoint.eventTimePointer.isBlank()?now:pointer(payload,endpoint.eventTimePointer,now);
-        Instant.parse(eventTime);
-        return new JsonObject().put("eventId", UUID.randomUUID().toString()).put("schemaVersion",2).put("endpoint",endpoint.name).put("kind",endpoint.kind)
-                .put("entityId",auth.entityId).put("eventTime",eventTime).put("ingestedAt",now).put("payload",payload).put("security",MediaProvenance.labels(auth.context,auth.entityId));
+    private EventMetadata metadata(HttpServerRequest request,Endpoint endpoint,Object payload) throws Exception {
+        String now=Instant.now().toString();
+        String fallback=endpoint.eventTimePointer.isBlank()?now:pointer(payload,endpoint.eventTimePointer,now);
+        return EventMetadata.from(request.getHeader("X-Event-Id"),request.getHeader("X-Event-Time"),fallback);
+    }
+    private JsonObject event(Endpoint endpoint, Authorized auth, Object payload, EventMetadata metadata) {
+        return new JsonObject().put("eventId",metadata.id().toString()).put("schemaVersion",2).put("endpoint",endpoint.name).put("kind",endpoint.kind)
+                .put("entityId",auth.entityId).put("eventTime",metadata.time().toString()).put("ingestedAt",Instant.now().toString()).put("payload",payload).put("security",MediaProvenance.labels(auth.context,auth.entityId));
     }
     private void publish(Endpoint endpoint, JsonObject event,Authorized auth) throws Exception {
         envelope.validate(event); access.require(auth.context,auth.resourceId,"ingest");
@@ -170,7 +173,7 @@ public final class IngestionMain {
         ByteArrayOutputStream out = new ByteArrayOutputStream(); receive(request,out,config.getLong("maxJsonBytes",900000L),context,null);
         Object payload = parsePayload(out.toString(java.nio.charset.StandardCharsets.UTF_8));
         Authorized auth=authorize(context,endpoint.resourcePointer.isBlank()?request.getHeader("X-Resource-Key"):pointer(payload,endpoint.resourcePointer,null)); authorized.set(auth); endpoint.schema.validate(payload);
-        JsonObject event = event(endpoint,auth,payload);
+        JsonObject event = event(endpoint,auth,payload,metadata(request,endpoint,payload));
         publish(endpoint,event,auth); respond(request,202,new JsonObject().put("eventId",event.getString("eventId")));
     }
     private void image(HttpServerRequest request, Endpoint endpoint,Authorized auth) throws Exception {
@@ -197,7 +200,7 @@ public final class IngestionMain {
                     .put("bytes",Files.size(target)).put("sha256",HexFormat.of().formatHex(digest.digest()));
             writeSidecar(MediaProvenance.sidecar(media,target),auth);
             if(objects!=null)objects.put(target);
-            JsonObject event = event(endpoint,auth,payload); publish(endpoint,event,auth); respond(request,202,event);
+            JsonObject event = event(endpoint,auth,payload,metadata(request,endpoint,payload)); publish(endpoint,event,auth); respond(request,202,event);
             if(objects!=null){Files.deleteIfExists(target);Files.deleteIfExists(MediaProvenance.sidecar(media,target));}
         } finally { Files.deleteIfExists(pending); }
     }
@@ -208,12 +211,14 @@ public final class IngestionMain {
         try (var channel=java.nio.channels.FileChannel.open(directory,StandardOpenOption.READ)) { channel.force(true); }
     }
     private void video(HttpServerRequest request, Endpoint endpoint,Authorized auth) throws Exception {
+        EventMetadata source=EventMetadata.from(request.getHeader("X-Event-Id"),request.getHeader("X-Event-Time"),Instant.now().toString());
         String id=UUID.randomUUID().toString(); Path folder=media.resolve(id); Files.createDirectory(folder); forceDirectory(media);
         writeSidecar(folder.resolve(".security.json"),auth);
         String playlist="/media/"+id+"/index.m3u8";
         Process process = new ProcessBuilder(VideoSegments.command(folder,config.getInteger("segmentSeconds",2))).redirectError(folder.resolve("ffmpeg.log").toFile()).start();
         AtomicBoolean finished = new AtomicBoolean(); AtomicInteger emitted = new AtomicInteger();
         CompletableFuture<Void> monitor = CompletableFuture.runAsync(() -> {
+            double elapsedSeconds=0;
             try {
                 do {
                     boolean finalScan = finished.get();
@@ -224,7 +229,8 @@ public final class IngestionMain {
                         JsonObject payload=new JsonObject().put("streamId",id).put("sequence",segment.sequence()).put("uri","/media/"+id+"/"+segment.filename())
                                 .put("playlistUri",playlist).put("durationSeconds",segment.duration()).put("keyframeAligned",true);
                         if(objects!=null){objects.put(folder.resolve(segment.filename()));publishPlaylist(folder,segment.sequence()+1,false);}
-                        publish(endpoint,event(endpoint,auth,payload),auth); emitted.incrementAndGet();
+                        publish(endpoint,event(endpoint,auth,payload,source.chunk(segment.sequence(),elapsedSeconds)),auth); emitted.incrementAndGet();
+                        elapsedSeconds+=segment.duration();
                         if(objects!=null)Files.deleteIfExists(folder.resolve(segment.filename()));
                     }
                     if (finalScan) {if(objects!=null)publishPlaylist(folder,emitted.get(),true);break;}

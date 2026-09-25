@@ -6,7 +6,7 @@
 
 Context Graph connects ingestion, stream processing, a relational lakehouse, SQL-backed APIs, and isolated task execution. Applications supply their JSON Schemas, SQL, and behavior. The platform supplies validation, transport, storage, permissions, and operational visibility.
 
-**The platform does not impose an ontology or generate node and edge tables.** Application data is stored in schema-derived Iceberg tables. Relationships, classifications, extractions, and domain concepts belong in application schemas and transformations.
+Application data is stored in schema-derived Iceberg tables. Application schemas and SQL transformations define relationships, classifications, and extracted information.
 
 Slack and GitHub are example ingestion adapters. Workplace search/chat and the metrics/video dashboard are reference applications. AX task execution and the application harness are shared platform capabilities.
 
@@ -16,7 +16,7 @@ Slack and GitHub are example ingestion adapters. Workplace search/chat and the m
 
 Each input endpoint has a JSON Schema and a Kafka topic. Vert.x validates input and stamps authenticated transport metadata. Flink validates again, maps declared fields into relational columns, and persists the dataset to Iceberg. Additional processing is defined in SQL.
 
-Unmapped keys go into **`_json_remainder VARIANT`**. Nested structured objects have their own remainder. Open-ended objects and heterogeneous values use native VARIANT directly; the platform does not stringify the entire document into an opaque payload column.
+Unmapped keys go into **`_json_remainder VARIANT`**. Nested structured objects have their own remainder. Open-ended objects and heterogeneous values use native VARIANT directly.
 
 For example:
 
@@ -40,7 +40,7 @@ _json_remainder          VARIANT {"observations":[1,"two",null,{"ok":true}]}
 
 Declared strings, booleans, bounded integers, exact bounded decimals, nested objects, and arrays get corresponding physical types. Unconstrained and heterogeneous values remain VARIANT. Iceberg tables use format version 3. Schema validation remains authoritative: a remainder does not permit keys forbidden by the schema.
 
-See the [mapping contract, numeric handling, and reserved columns](docs/json-schema-storage.md). There is no migration or compatibility path for the removed fixed node/edge storage model.
+See the [mapping contract, numeric handling, and reserved columns](docs/json-schema-storage.md).
 
 ## Major components
 
@@ -52,13 +52,14 @@ See the [mapping contract, numeric handling, and reserved columns](docs/json-sch
 | Iceberg + Polaris | Relational tables, snapshots, catalog metadata, and service credential vending |
 | RustFS | Private local S3 object storage for warehouse files, media, and recovery state |
 | DuckDB | SQL serving through `iceberg` and `cache_httpfs`; authorized inputs before query execution |
+| Authenticated MCP | Read-only dataset discovery and query access for MCP clients, with delegated user permissions |
 | Vert.x GraphQL | SQL-derived queries, validated event mutations, Kafka subscriptions over `graphql-transport-ws` |
 | OIDC + SpiceDB | Verified identities, workspace/resource permissions, and imported source access |
 | AX + Substrate | Task definitions, workspaces, and isolated task workers |
 | Application harness | Compile schemas and SQL into reviewable deployment bundles |
 | Temporal | Scheduled example source synchronization and retries |
 | Control plane | Independent read-only inventory, API/query definitions, Flink status, and metrics |
-| PostgreSQL | Supporting authorization, catalog, and connector state; not the application lakehouse |
+| PostgreSQL | Authorization, catalog, and connector state |
 
 Flink jobs run as ordinary Kubernetes JobManager/TaskManager deployments. No Flink Kubernetes operator is required. Multiple jobs can produce application-specific datasets and temporal views.
 
@@ -121,7 +122,7 @@ mutation {
 }
 ```
 
-A mutation reports Kafka acceptance. It does not claim that an Iceberg snapshot already contains the write. API field types come from query result schemas and input contracts; nested and VARIANT results use the GraphQL JSON scalar.
+A mutation reports Kafka acceptance; the write becomes queryable after stream processing and an Iceberg snapshot commit. API field types come from query result schemas and input contracts; nested and VARIANT results use the GraphQL JSON scalar.
 
 See the [harness guide](services/harness/README.md) for compilation, rendering, deployment, and promotion. Temporal views are ordinary Flink SQL. The [group activity example](examples/group-insights) demonstrates event-time windows and run-event ingestion.
 
@@ -129,9 +130,9 @@ See the [harness guide](services/harness/README.md) for compilation, rendering, 
 
 ![Permission boundaries](docs/diagrams/permission-boundaries.svg)
 
-New bundle ingestion endpoints take `X-Resource-Key` separately from the document. The server verifies the caller's write access and attaches trusted workspace/resource labels. Documents do not need an `entityId` field. Explicit endpoint bindings can instead select a resource key from a declared JSON Pointer.
+Bundle ingestion endpoints take `X-Resource-Key` separately from the document. The server verifies the caller's write access and attaches trusted workspace/resource labels. Explicit endpoint bindings can instead select a resource key from a declared JSON Pointer.
 
-SpiceDB evaluates access to resources. It does not define an application data model. SQL transformations must preserve scope; the harness rejects transformations whose allowed scope rules cannot be established.
+SpiceDB evaluates access to resources. SQL transformations must preserve scope; the harness rejects transformations whose allowed scope rules cannot be established.
 
 The serving API materializes authorized rows before configured SQL, joins, or aggregates run, and rechecks access before returning. Subscriptions check permissions per emission. Media playlists, segments, originals, and byte ranges pass through authorization. Task workers receive delegated API access or scoped callbacks.
 
@@ -145,7 +146,7 @@ See [security architecture](docs/security-architecture.md), [network boundaries]
 
 Applications delegate tasks to AX; Substrate runs their worker images in isolated sandboxes. Application code determines what a task does and which outputs it produces. Workers use permissioned platform APIs and can ingest ordinary run events through a configured endpoint.
 
-Builders can run `cg` in an AX workspace to author and compile schemas, processing SQL, and API definitions. Deployment privileges stay with the release workflow. No single agent loop is required to build or operate an application.
+Builders can run `cg` in an AX workspace to author and compile schemas, processing SQL, and API definitions. Deployment privileges stay with the release workflow.
 
 The shipped workplace assistant uses AX retrieval tasks, a trusted coordinator, DeepSeek planning and synthesis, and streamed citations checked against the caller's permissions. It is one application of the execution infrastructure.
 
@@ -153,7 +154,7 @@ See [AX execution and operations](docs/ax.md).
 
 ## Images and streaming video
 
-The ingestion service accepts self-contained PNG/JPEG images and streamed video. It extracts metadata, stores media in private object storage, and publishes metadata to endpoint topics. Video is normalized into independently decodable, keyframe-aligned HLS chunks. Media bytes do not travel through Kafka.
+The ingestion service accepts self-contained PNG/JPEG images and streamed video. It extracts metadata, stores media in private object storage, and publishes metadata to endpoint topics. Video is normalized into independently decodable, keyframe-aligned HLS chunks. Kafka carries media metadata and object references.
 
 Image and video metadata have their own JSON Schemas and relational tables. OCR, transcription, meeting-note extraction, and other application behavior can be added as jobs or AX tasks consuming those datasets.
 
@@ -176,7 +177,7 @@ Incremental RocksDB checkpoints, retained externalized checkpoints, and savepoin
 
 ## Reference application screenshots
 
-The screenshots below show packaged applications and the independent control plane. They are not the definition of the platform.
+The screenshots below show reference applications and the independent control plane.
 
 ![Read-only control plane](docs/control-plane.png)
 
@@ -205,6 +206,7 @@ Historical deployment measurements in [`docs/validation.md`](docs/validation.md)
 - [AX tasks and workspaces](docs/ax.md)
 - [Security](docs/security-architecture.md)
 - [Lakehouse and federation](docs/lakehouse.md)
+- [Authenticated MCP access](docs/mcp.md)
 - [Control plane](docs/control-plane.md)
 - [Search reference application](docs/search.md)
 - [Architecture diagrams](docs/diagrams/README.md)

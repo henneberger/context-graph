@@ -278,6 +278,9 @@ spec:
   ports:
   - name: https
     port: 8443
+  - name: oauth
+    port: 8444
+    targetPort: 8444
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -297,6 +300,7 @@ spec:
     metadata:
       labels:
         app: identity
+        context-graph-role: identity
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9404'
@@ -308,32 +312,45 @@ spec:
         fsGroup: 10003
       containers:
       - name: identity
-        image: context-graph/identity:observability-v1
+        image: context-graph/identity:mcp-v4
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8443
         - containerPort: 9404
           name: metrics
+        - containerPort: 8444
         env:
         - name: OIDC_ISSUER
           value: https://identity:8443
         - name: OIDC_AUDIENCE
           value: context-graph
+        - name: OAUTH_PUBLIC_URL
+          value: https://localhost:18445
+        - name: MCP_PUBLIC_URL
+          value: https://localhost:18090/mcp
+        - name: OAUTH_DATABASE_URI
+          valueFrom:
+            secretKeyRef:
+              name: identity-oauth
+              key: database-uri
         resources:
           requests:
             cpu: 50m
             memory: 48Mi
           limits:
-            memory: 128Mi
+            memory: 256Mi
         readinessProbe:
           httpGet:
             scheme: HTTPS
-            path: /health/live
-            port: 8443
+            path: /health/ready
+            port: 8444
           periodSeconds: 5
         volumeMounts:
         - name: secrets
           mountPath: /run/identity
+          readOnly: true
+        - name: oauth-ca
+          mountPath: /run/oauth-ca
           readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
@@ -341,6 +358,13 @@ spec:
             drop:
             - ALL
       volumes:
+      - name: oauth-ca
+        secret:
+          secretName: mcp-security
+          items:
+          - key: ca.crt
+            path: ca.crt
+          defaultMode: 288
       - name: secrets
         secret:
           secretName: identity-security

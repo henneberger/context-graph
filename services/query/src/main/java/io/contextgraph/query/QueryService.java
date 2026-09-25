@@ -61,7 +61,7 @@ public final class QueryService {
     db.discover().forEach((name,table)->{if(IcebergQueries.registered(table,policies.get(name)))tables.put(name,table);});
     StringBuilder sdl=new StringBuilder(config.path("types").asText());
     sdl.append("\ntype Column { name: String! type: String! nullable: Boolean! }\ntype TableSchema { name: String! columns: [Column!]! }\ntype Query { schemas: [TableSchema!]!\n");
-    RuntimeWiring.Builder wiring=RuntimeWiring.newRuntimeWiring().scalar(ExtendedScalars.Json).scalar(ExtendedScalars.GraphQLLong);
+    RuntimeWiring.Builder wiring=RuntimeWiring.newRuntimeWiring().scalar(ExtendedScalars.Json).scalar(ExtendedScalars.GraphQLLong).scalar(ExactScalars.DECIMAL).scalar(ExactScalars.BIG_INT);
     TypeRuntimeWiring.Builder query=TypeRuntimeWiring.newTypeWiring("Query").dataFetcher("schemas",env->CompletableFuture.supplyAsync(()->{
       SecurityContext context=env.getGraphQlContext().get("security");permissions.workspace(context,"view_schema");
       return tables.values().stream().map(t->Map.of("name",t.name(),"columns",t.columns().stream().map(c->Map.of("name",c.name(),"type",c.type(),"nullable",c.nullable())).toList())).toList();

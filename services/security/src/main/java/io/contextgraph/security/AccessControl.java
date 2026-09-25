@@ -52,7 +52,10 @@ public final class AccessControl {
             if(!(key instanceof RSAKey rsa) || rsa.isPrivate() || rsa.getKeyUse()!=null && !KeyUse.SIGNATURE.equals(rsa.getKeyUse()) || rsa.getAlgorithm()!=null && !JWSAlgorithm.RS256.equals(rsa.getAlgorithm()) || rsa.size()<2048 || !jwt.verify(new RSASSAVerifier(rsa.toRSAPublicKey()))) throw new AuthException(401,"Invalid token signature");
             var claims=jwt.getJWTClaimsSet(); long now=Instant.now().getEpochSecond();
             if(!issuer.equals(claims.getIssuer()) || claims.getAudience()==null || !claims.getAudience().contains(audience) || claims.getExpirationTime()==null || claims.getExpirationTime().toInstant().getEpochSecond()<=now || claims.getNotBeforeTime()!=null && claims.getNotBeforeTime().toInstant().getEpochSecond()>now || claims.getSubject()==null || claims.getSubject().isBlank() || claims.getSubject().equals("*") || claims.getSubject().length()>256 || claims.getSubject().chars().anyMatch(Character::isISOControl)) throw new AuthException(401,"Invalid token claims");
-            context=new SecurityContext(claims.getSubject(),workspaceId,claims.getExpirationTime().toInstant().getEpochSecond());
+            if (claims.getClaim("workspace")!=null && !workspaceId.equals(claims.getStringClaim("workspace"))) throw new AuthException(403,"Token is bound to another workspace");
+            String scope=claims.getStringClaim("scope");
+            if(scope!=null && !Arrays.asList(scope.split(" ")).contains("context:read") && !Arrays.asList(scope.split(" ")).contains("context:write")) throw new AuthException(403,"Token scope does not grant data access");
+            context=new SecurityContext(claims.getSubject(),workspaceId,claims.getExpirationTime().toInstant().getEpochSecond(),scope==null || Arrays.asList(scope.split(" ")).contains("context:write"));
         } catch(AuthException e) { throw e; }
         catch(Exception e) { throw new AuthException(401,"Invalid token"); }
         requireWorkspace(context,"access"); return context;
@@ -79,11 +82,13 @@ public final class AccessControl {
     }
     public void requireWorkspace(SecurityContext context,String permission) {
         checkExpiry(context); validateWorkspace(context.workspaceId());
+        if("manage".equals(permission) && !context.writeAllowed()) throw new AuthException(403,"Read-only token");
         if(!Set.of("access","manage","view_schema").contains(permission)) throw new AuthException(403,"Permission denied");
         if(!check(context,"workspace",context.workspaceId(),permission)) throw new AuthException(403,"Permission denied");
     }
     public boolean allowed(SecurityContext context,String resourceId,String permission) {
         requireWorkspace(context,"access");
+        if("ingest".equals(permission) && !context.writeAllowed()) throw new AuthException(403,"Read-only token");
         if(resourceId==null || !resourceId.matches("[a-f0-9]{64}") || !Set.of("view","ingest").contains(permission)) throw new AuthException(403,"Permission denied");
         return check(context,"entity",resourceId,permission);
     }

@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml,requests
 from .compiler import ROOT,Invalid,compile_bundle,identifier
 NS='context-graph'
-IMAGES={'ingestion':'context-graph/ingestion:schema-v1','query':'context-graph/query:schema-v1','processor':'context-graph/processor:schema-v1'}
+IMAGES={'ingestion':'context-graph/ingestion:mcp-v1','query':'context-graph/query:mcp-v1','processor':'context-graph/processor:schema-v1'}
 def kubectl(context,*args,**kwargs):return subprocess.run(['kubectl','--context',context,'-n',NS,*args],check=True,text=True,**kwargs)
 def load(path):return json.loads((Path(path)/'bundle.json').read_text())
 def meta(name,labels=None):return {'name':name,'namespace':NS,'labels':labels or {}}

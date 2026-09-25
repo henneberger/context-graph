@@ -25,7 +25,8 @@ class IngestionTest {
         var schema=new SchemaCheck(schemas().resolve("event-input.json"));
         assertThrows(IllegalArgumentException.class,()->schema.validate(new JsonObject().put("eventTime","invalid")));
         schema.validate(new JsonObject().put("entityId","sensor").put("nested",new JsonObject().put("a",true)));
-        assertThrows(IllegalArgumentException.class,()->schema.validate(new JsonObject().put("entityId","sensor").put("security",new JsonObject().put("subjectId","admin"))));
+        // A payload key named security is ordinary data; authorization comes from the server-stamped envelope.
+        schema.validate(new JsonObject().put("security",new JsonObject().put("subjectId","admin")));
         assertThrows(IllegalArgumentException.class,()->schema.validate(new JsonObject().put("value","not numeric")));
     }
     @Test void mediaWithoutSidecarAndRemappedLabelsDeny() throws Exception {

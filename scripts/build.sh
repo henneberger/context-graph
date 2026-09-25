@@ -2,12 +2,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 tag="${IMAGE_TAG:-}"
-for service in identity check-proxy ingestion processor query dashboard control kafka connectors search-api search-ui control-ui; do
+for service in mcp identity check-proxy ingestion processor query dashboard control kafka connectors search-api search-ui control-ui; do
   service_tag="$tag"
   if [[ -z "$service_tag" ]]; then
     service_tag=observability-v1
     case "$service" in
-      query|dashboard|control|search-api|search-ui|control-ui) service_tag=search-v1 ;;
+      mcp) service_tag=mcp-v3 ;;
+      identity) service_tag=mcp-v4 ;;
+      ingestion|query) service_tag=mcp-v1 ;;
+      dashboard|control|search-api|search-ui|control-ui) service_tag=search-v1 ;;
       connectors) service_tag=search-v2 ;;
     esac
   fi

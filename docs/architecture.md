@@ -2,7 +2,7 @@
 
 ![Platform data paths](diagrams/context-graph-overview.svg)
 
-JSON Schemas define datasets. Application SQL defines transformations and views. The platform supplies transport, execution, permissions, catalog/storage access, and APIs. It does not create a domain ontology or require node and edge tables.
+JSON Schemas define datasets. Application SQL defines transformations and views. The platform supplies transport, execution, permissions, catalog/storage access, and APIs.
 
 ## Data path
 
@@ -22,7 +22,7 @@ The harness compiles JSON Schema, Flink SQL, serving SQL, and operation bindings
 
 Each input dataset has one persistence owner. Jobs use explicit source bindings and application-defined SQL. Scope rules constrain transformations so an application cannot relabel private inputs as a public output. Tables are append-only in the current job writer; updating views require an explicit changelog contract.
 
-The reference configuration includes temporal measurement SQL, media metadata, and example connector datasets. Those are application definitions, not special storage kinds in the processor. No fixed aggregation DSL or node/edge projection runs alongside them.
+The reference configuration includes temporal measurement SQL, media metadata, and example connector datasets. These datasets and transformations are configured through application schemas and SQL.
 
 ## Task execution
 

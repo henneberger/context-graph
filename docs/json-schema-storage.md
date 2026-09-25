@@ -1,6 +1,6 @@
 # JSON Schema → Flink → Iceberg
 
-JSON Schema is the input contract. Root arrays, scalars, and null are accepted when the schema permits them; without declared object fields, the whole value is stored in `_json_remainder VARIANT`. The platform does not define node types, relationships, or an application ontology. Each endpoint has its own schema and Kafka input topic. A schema adapter validates each payload again in Flink, produces relational fields, and writes the input dataset to Iceberg. Applications define additional SQL views when they need transformations.
+JSON Schema is the input contract. Root arrays, scalars, and null are accepted when the schema permits them; without declared object fields, the whole value is stored in `_json_remainder VARIANT`. Each endpoint has its own schema and Kafka input topic. A schema adapter validates each payload again in Flink, produces relational fields, and writes the input dataset to Iceberg. Applications define additional SQL views when they need transformations.
 
 ## Structured fields and the remainder
 
@@ -59,28 +59,34 @@ Numbers are parsed as decimals before mapping. Values exceeding native VARIANT d
 
 The schema adapter supports acyclic local references for structured fields. `_json_remainder` cannot be declared as a user field. Transport columns are reserved: `workspace_id`, `resource_id`, `entity_id`, `event_id`, `event_time`, and `ingested_at`. A collision fails compilation rather than overwriting user data.
 
+## Event identity and time
+
+Ingestion stamps every event with a UUID, event time, and server ingestion time. Producers may supply `X-Event-Id` as a canonical UUID and `X-Event-Time` as an ISO-8601 timestamp. Without those headers, ingestion generates the UUID and uses the endpoint's configured payload timestamp or server time. Access labels remain separate authenticated metadata.
+
+For streamed video, each segment receives a UUID derived from the upload event UUID and segment sequence. Segment event times advance from the supplied start time by elapsed segment duration. Supplying a stable event UUID preserves source identity; duplicate suppression requires an application processing policy.
+
 ## Authorization is transport metadata
 
-New bundle endpoints take their access resource from the `X-Resource-Key` header, separately from the JSON document. GraphQL mutations take a separate `resourceKey` argument. The server verifies the caller's permission and stamps the envelope. A document does not need an `entityId` property.
+Bundle endpoints take their access resource from the `X-Resource-Key` header, separately from the JSON document. GraphQL mutations take a separate `resourceKey` argument. The server verifies the caller's permission and stamps the envelope.
 
-`entity_id` is currently the internal column name for that authorization resource key. It does not cause an entity table or relationship to be created. SQL output scope columns must remain unchanged, and resource-local aggregates must group by them.
+`entity_id` is currently the internal column name for that authorization resource key. SQL output scope columns must remain unchanged, and resource-local aggregates must group by them.
 
-Existing example endpoints explicitly bind their resource key using a configured JSON Pointer. That is an endpoint definition, not inferred document semantics.
+Existing example endpoints explicitly bind their resource key using a configured JSON Pointer. The binding is part of the endpoint configuration.
 
 ## Runtime and APIs
 
-The source uses the standard Kafka connector with string deserialization followed by the schema adapter. A connector fork is unnecessary for this implementation. Native Flink VARIANT values are written through the Iceberg adapter to format-version 3 tables. Nested structs, lists, decimals, and VARIANT values also survive SQL outputs and Kafka change records.
+The source uses the standard Kafka connector with string deserialization followed by the schema adapter. Native Flink VARIANT values are written through the Iceberg adapter to format-version 3 tables. Nested structs, lists, decimals, and VARIANT values also survive SQL outputs and Kafka change records.
 
 The serving API uses DuckDB with `iceberg` and `cache_httpfs`. JDBC nested values are normalized to structured maps and lists. GraphQL exposes nested and VARIANT results as JSON scalars; primitive fields retain their derived scalar types. Open-ended mutation inputs use a JSON scalar so GraphQL does not discard/reject keys allowed by JSON Schema. Flink revalidates the input regardless of the entry path.
 
+Generated GraphQL inputs use `BigInt` for integers and `Decimal` for numbers. Clients can send exact values as decimal strings; inline numeric literals also preserve precision. These scalars serialize as strings to preserve precision in clients using binary floating point. SQL DECIMAL result columns use `Decimal`. Nested and VARIANT values continue to use the JSON scalar.
+
 Standalone platform sources can explicitly specify their workspace; bundle sources inherit the bundle workspace. A source rejects envelopes from other workspaces.
 
-Each input has one owning persistence job. Additional jobs and datasets are explicit bundle definitions. There are no mandatory node/edge sinks and no fixed aggregation DSL. Temporal computations are SQL views.
+Each input has one owning persistence job. Additional jobs and datasets are explicit bundle definitions. Temporal computations are SQL views.
 
 ## Example and verification
 
 [`examples/schema-data`](../examples/schema-data) contains an input schema with nested objects, arrays, unconstrained attributes, and an open remainder; its bundle persists records without requiring a transformation view. Query, mutation, and subscription APIs derive from that dataset.
 
 `JsonSchemaRowsTest` covers structured mapping, nested remainders, schema rejection, heterogeneous values, numeric precision, and a real Flink write to Iceberg followed by native readback. `VariantQueryTest` checks structured DuckDB JDBC results. The optional Kafka integration test checks committed output and the error topic against a real broker.
-
-This is a replacement storage contract. There is no converter for the removed fixed event/node/edge tables and no attempt to restore their Flink state into the new job.

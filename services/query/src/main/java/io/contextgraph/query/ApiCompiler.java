@@ -25,7 +25,7 @@ public final class ApiCompiler {
   public static void main(String[] args)throws Exception {
     JsonNode config=JSON.readTree(Path.of(args[0]).toFile());ObjectNode out=JSON.createObjectNode();
     ObjectNode registered=out.putObject("registeredTables"),queries=out.putObject("queries"),subscriptions=out.putObject("subscriptions"),mutations=out.putObject("mutations");
-    String namespace=config.path("namespace").asText();StringBuilder types=new StringBuilder("scalar JSON\nscalar Long\ntype CommandReceipt { eventId: String! status: String! }\n");
+    String namespace=config.path("namespace").asText();StringBuilder types=new StringBuilder("scalar JSON\nscalar Long\nscalar Decimal\nscalar BigInt\ntype CommandReceipt { eventId: String! status: String! }\n");
     var views=config.path("views");
     for(var iter=views.fields();iter.hasNext();) {var view=iter.next();name(view.getKey());registered.putObject(namespace+"."+view.getKey()).put("entityColumn","entity_id");}
     for(var iter=config.path("api").path("queries").fields();iter.hasNext();) {
@@ -49,7 +49,7 @@ public final class ApiCompiler {
             for(int i=1;i<=meta.getColumnCount();i++){String label=name(meta.getColumnLabel(i));if(!labels.add(label))throw new IllegalArgumentException("Duplicate result label");
               String type=switch(meta.getColumnType(i)){case java.sql.Types.INTEGER,java.sql.Types.SMALLINT,java.sql.Types.TINYINT->"Int";case java.sql.Types.BIGINT->"Long";
                 case java.sql.Types.FLOAT,java.sql.Types.REAL,java.sql.Types.DOUBLE->"Float";case java.sql.Types.BOOLEAN,java.sql.Types.BIT->"Boolean";
-                case java.sql.Types.VARCHAR,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.DATE->"String";case java.sql.Types.STRUCT,java.sql.Types.ARRAY,java.sql.Types.JAVA_OBJECT,java.sql.Types.OTHER->"JSON";case java.sql.Types.DECIMAL,java.sql.Types.NUMERIC->"String";default->throw new IllegalArgumentException("Cast result type explicitly: "+label);};
+                case java.sql.Types.VARCHAR,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.DATE->"String";case java.sql.Types.STRUCT,java.sql.Types.ARRAY,java.sql.Types.JAVA_OBJECT,java.sql.Types.OTHER->"JSON";case java.sql.Types.DECIMAL,java.sql.Types.NUMERIC->"Decimal";default->throw new IllegalArgumentException("Cast result type explicitly: "+label);};
               types.append(label).append(": ").append(type).append('\n');}
           }
         }
@@ -74,7 +74,7 @@ public final class ApiCompiler {
     if(!schema.path("additionalProperties").isBoolean()||schema.path("additionalProperties").asBoolean()||schema.has("patternProperties")||schema.has("$ref"))return "JSON";
     var fields=new StringBuilder();Set<String> required=new HashSet<>();schema.path("required").forEach(v->required.add(v.asText()));
     for(var it=schema.path("properties").fields();it.hasNext();) {var f=it.next();if(f.getValue().isBoolean())continue;String field=name(f.getKey());JsonNode spec=f.getValue();String t=switch(spec.path("type").asText()) {
-      case "string"->"String";case "integer"->"Long";case "number"->"Float";case "boolean"->"Boolean";
+      case "string"->"String";case "integer"->"BigInt";case "number"->"Decimal";case "boolean"->"Boolean";
       case "object"->spec.has("properties")?inputType(spec,type+"_"+field,types):"JSON";case "array"->"JSON";default->"JSON";};
       fields.append(field).append(": ").append(t).append(required.contains(field)?"!":"").append('\n');
     }

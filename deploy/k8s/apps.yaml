@@ -26,7 +26,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: ingestion
-        image: context-graph/ingestion:schema-v1
+        image: context-graph/ingestion:mcp-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -196,7 +196,7 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
       - name: query
-        image: context-graph/query:schema-v1
+        image: context-graph/query:mcp-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081

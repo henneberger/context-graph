@@ -24,9 +24,9 @@ The current request executor has bounded input rows/resources and memory. Furthe
 
 `config/jobs.yaml` is the reference application's schema/SQL job definition. `config/queries.yaml` contains its configured SQL operations. Application bundles generate their own definitions, schemas, topics, catalog roles, and tables.
 
-Native Flink JobManager/TaskManager Deployments use incremental RocksDB checkpoints and object-storage savepoints. SQL-defined tables replace the removed fixed event/node/edge storage kinds. There is no old-table migration runner.
+Native Flink JobManager/TaskManager Deployments use incremental RocksDB checkpoints and object-storage savepoints.
 
-For a clean local replacement, the explicit reset command stops writers, purges application tables, clears input/output streams, applies the replacement runtime, and makes example connectors scrape again:
+To reset a local development deployment, the explicit reset command stops writers, purges application tables, clears input/output streams, applies the replacement runtime, and makes example connectors scrape again:
 
 ```sh
 python scripts/reset-schema-runtime.py --context YOUR_CONTEXT --node YOUR_NODE --reset-data

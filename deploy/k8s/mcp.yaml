@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service
+metadata: {name: mcp, namespace: context-graph}
+spec:
+  selector: {app: mcp}
+  ports: [{name: https, port: 8443, targetPort: 8443}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mcp, namespace: context-graph}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: mcp}}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  template:
+    metadata:
+      labels: {app: mcp, context-graph-role: mcp, context-graph-control-plane: "true"}
+      annotations: {prometheus.io/scrape: 'true', prometheus.io/port: '9404', prometheus.io/path: /metrics}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 10005, fsGroup: 10005}
+      containers:
+      - name: mcp
+        image: context-graph/mcp:mcp-v3
+        imagePullPolicy: IfNotPresent
+        ports: [{name: https, containerPort: 8443}, {name: metrics, containerPort: 9404}]
+        env:
+        - {name: QUERY_URL, value: 'https://query:8081/graphql'}
+        - {name: MCP_PUBLIC_URL, value: 'https://localhost:18090/mcp'}
+        - {name: MCP_AUTH_ISSUER, value: 'https://localhost:18445'}
+        - {name: MCP_INTROSPECTION_URL, value: 'https://identity:8444/introspect'}
+        - {name: MCP_EXCHANGE_URL, value: 'https://identity:8444/exchange'}
+        - {name: CA_FILE, value: /run/mcp/ca.crt}
+        - {name: TLS_CERT, value: /run/mcp/server.crt}
+        - {name: TLS_KEY, value: /run/mcp/server.key}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 384Mi}}
+        readinessProbe: {httpGet: {path: /health/live, port: 8443, scheme: HTTPS}, periodSeconds: 5, timeoutSeconds: 5}
+        livenessProbe: {httpGet: {path: /health/live, port: 8443, scheme: HTTPS}, periodSeconds: 10, timeoutSeconds: 5}
+        volumeMounts: [{name: security, mountPath: /run/mcp, readOnly: true}]
+      volumes: [{name: security, secret: {secretName: mcp-security, defaultMode: 288}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: mcp-access, namespace: context-graph}
+spec:
+  podSelector: {matchLabels: {app: mcp}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from: [{podSelector: {matchLabels: {app: dashboard}}}]
+    ports: [{protocol: TCP, port: 8443}]
+  - from: [{podSelector: {matchLabels: {app: prometheus}}}]
+    ports: [{protocol: TCP, port: 9404}]
+  egress:
+  - to: [{podSelector: {matchLabels: {app: query}}}]
+    ports: [{protocol: TCP, port: 8081}]
+  - to: [{podSelector: {matchLabels: {app: identity}}}]
+    ports: [{protocol: TCP, port: 8444}]
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]
+    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: mcp-query, namespace: context-graph}
+spec:
+  podSelector: {matchLabels: {app: query}}
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{podSelector: {matchLabels: {app: mcp}}}]
+    ports: [{protocol: TCP, port: 8081}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: identity-oauth, namespace: context-graph}
+spec:
+  podSelector: {matchLabels: {app: identity}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from: [{podSelector: {matchLabels: {app: mcp}}}]
+    ports: [{protocol: TCP, port: 8444}]
+  egress:
+  - to: [{podSelector: {matchLabels: {app: spicedb-postgres}}}]
+    ports: [{protocol: TCP, port: 5432}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: oauth-database, namespace: context-graph}
+spec:
+  podSelector: {matchLabels: {app: spicedb-postgres}}
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{podSelector: {matchLabels: {app: identity}}}]
+    ports: [{protocol: TCP, port: 5432}]

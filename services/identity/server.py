@@ -13,10 +13,20 @@ USERS=json.loads((ROOT/'users.json').read_text())
 JWKS=json.loads((ROOT/'jwks.json').read_text())
 
 def encode(value):return base64.urlsafe_b64encode(value).rstrip(b'=').decode()
-def token(subject,ttl=300):
+def token(subject,ttl=300,scope=None,workspace=None):
     now=int(time.time());header=encode(json.dumps({'alg':'RS256','typ':'JWT','kid':JWKS['keys'][0]['kid']},separators=(',',':')).encode())
-    claims=encode(json.dumps({'iss':ISSUER,'aud':AUDIENCE,'sub':subject,'iat':now,'nbf':now,'exp':now+ttl},separators=(',',':')).encode())
+    values={'iss':ISSUER,'aud':AUDIENCE,'sub':subject,'iat':now,'nbf':now,'exp':now+ttl}
+    if scope is not None:values['scope']=scope
+    if workspace is not None:values['workspace']=workspace
+    claims=encode(json.dumps(values,separators=(',',':')).encode())
     message=f'{header}.{claims}';return message+'.'+encode(KEY.sign(message.encode(),padding.PKCS1v15(),hashes.SHA256()))
+
+def authenticate(name,password):
+    if not isinstance(name,str) or not isinstance(password,str) or len(password)>256:return None
+    record=USERS.get(name)
+    salt=bytes.fromhex(record['salt']) if record else b'\0'*16
+    actual=hashlib.scrypt(password.encode(),salt=salt,n=16384,r=8,p=1).hex()
+    return record['subject'] if record and hmac.compare_digest(actual,record['hash']) else None
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass # Never log credentials, tokens or request bodies.
@@ -45,6 +55,14 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,KeyError,TypeError):self.reply(400,{'error':'invalid_request'})
 
 if __name__=='__main__':
+    if os.environ.get('OAUTH_DATABASE_URI'):
+        import threading,oauth
+        def run_oauth():
+            try:
+                oauth.run()
+            finally:
+                os._exit(1)  # A failed OAuth listener must restart the whole issuer.
+        threading.Thread(target=run_oauth,daemon=True).start()
     from http_metrics import instrument
     instrument(Handler)
     server=ThreadingHTTPServer(('0.0.0.0',8443),Handler)

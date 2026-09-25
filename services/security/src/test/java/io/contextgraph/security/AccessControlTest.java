@@ -43,6 +43,18 @@ class AccessControlTest {
         var jwt=new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key").build(),claims); jwt.sign(new RSASSASigner(signer)); return "Bearer "+jwt.serialize();
     }
     String validToken() throws Exception { long now=Instant.now().getEpochSecond(); return token(key,base,"context-graph",now+60,now-1); }
+    @Test void delegatedReadScopeIsWorkspaceBoundAndCannotWriteOrManage() throws Exception {
+        var claims=new JWTClaimsSet.Builder().issuer(base).audience("context-graph").subject("alice")
+            .expirationTime(Date.from(Instant.now().plusSeconds(60))).claim("workspace","workspace-a").claim("scope","context:read").build();
+        var jwt=new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key").build(),claims);
+        jwt.sign(new RSASSASigner(key)); String authorization="Bearer "+jwt.serialize();
+        var context=access.authenticate(authorization,"workspace-a");
+        assertFalse(context.writeAllowed());
+        access.require(context,AccessControl.resourceId("workspace-a","record"),"view");
+        assertEquals(403,assertThrows(AuthException.class,()->access.authenticate(authorization,"workspace-b")).status());
+        assertEquals(403,assertThrows(AuthException.class,()->access.require(context,AccessControl.resourceId("workspace-a","record"),"ingest")).status());
+        assertEquals(403,assertThrows(AuthException.class,()->access.requireWorkspace(context,"manage")).status());
+    }
     @Test void signatureIssuerAudienceExpiryAndNotBeforeCannotBeForged() throws Exception {
         long now=Instant.now().getEpochSecond();
         List<String> bad=List.of(token(new RSAKeyGenerator(2048).generate(),base,"context-graph",now+60,now-1),token(key,"https://wrong-issuer","context-graph",now+60,now-1),token(key,base,"other-audience",now+60,now-1),token(key,base,"context-graph",now-1,now-2),token(key,base,"context-graph",now+60,now+30),"Bearer not-a-jwt");

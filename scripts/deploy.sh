@@ -31,6 +31,7 @@ kubectl --context "$context" apply -f .runtime/postgres.yaml
 kubectl --context "$context" -n context-graph rollout status statefulset/spicedb-postgres --timeout=180s
 "$python" scripts/deploy-lakehouse.py --context "$context" --node "$node"
 "$python" scripts/provision-control.py --context "$context"
+"$python" scripts/provision-mcp.py --context "$context"
 "$python" scripts/provision-connectors.py --context "$context"
 "$python" - "$context" "$node" "${IMAGE_TAG:-secure-v6}" > .runtime/rendered.yaml <<'PYTHON'
 import ipaddress,json,subprocess,sys,yaml
@@ -57,7 +58,7 @@ kubectl --context "$context" -n context-graph wait --for=condition=complete job/
 kubectl --context "$context" -n context-graph rollout status statefulset/secure-kafka --timeout=300s
 kubectl --context "$context" -n context-graph wait --for=condition=complete job/secure-topics-schema-v1 --timeout=180s
 kubectl --context "$context" -n context-graph rollout status statefulset/temporal --timeout=300s
-for service in spicedb spicedb-checks identity ingestion query control prometheus otel-collector postgres-exporter dashboard control-ui search-api search-ui connectors; do
+for service in spicedb spicedb-checks identity mcp ingestion query control prometheus otel-collector postgres-exporter dashboard control-ui search-api search-ui connectors; do
   kubectl --context "$context" -n context-graph rollout status "deployment/$service" --timeout=300s
 done
 "$python" scripts/wait-flink.py --context "$context" --name context-secure-v1
