@@ -107,4 +107,10 @@ class IngestionTest {
             assertTrue(segment.duration()<=2.1);
         }
     }
+  @org.junit.jupiter.api.Test void arbitraryJsonNumbersKeepTheirPrecisionBeforeKafka() throws Exception {
+    String json="{\"value\":12345678901234567890.123456789,\"unknown\":{\"nested\":[null,true,1.25]}}";
+    var parsed=IngestionMain.parsePayload(json);
+    assertTrue(io.vertx.core.json.Json.encode(parsed).contains("12345678901234567890.123456789"));
+    assertEquals(new java.math.BigDecimal("12345678901234567890.123456789"),((java.util.Map<?,?>)parsed).get("value"));
+  }
 }

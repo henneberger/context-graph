@@ -1,57 +1,39 @@
-# Context graph architecture
+# Platform architecture
 
-![context graph overview](diagrams/context-graph-overview.svg)
+![Platform data paths](diagrams/context-graph-overview.svg)
 
-## Service boundaries
+JSON Schemas define datasets. Application SQL defines transformations and views. The platform supplies transport, execution, permissions, catalog/storage access, and APIs. It does not create a domain ontology or require node and edge tables.
 
-Java 21, Maven modules: services/ingestion (Vert.x 5.2.0), services/processor (Flink 2.3.0), services/query (Vert.x 5.2.0, GraphQL Java, Reactor, DuckDB JDBC). Independent signed-in dashboard, local OIDC issuer, and SpiceDB authorization services. Mandatory security contracts are defined in [security architecture](security-architecture.md). Configuration is mounted read-only under /app/config. Polaris manages the Iceberg REST catalog; RustFS stores warehouse, media and new Flink recovery state in separate private buckets. Pod-local disk is used for staging. The old data volume is retained offline for migration rollback, and is no longer mounted by running services. See [governed lakehouse and federation](lakehouse.md). The local RustFS and PostgreSQL instances remain single-node availability limits.
+## Data path
 
-Ingestion validates incoming JSON against endpoint schemas and outgoing envelopes against an envelope schema. Topic per endpoint, error topic for invalid input/processing failures, acknowledgements only after Kafka confirms publishing. Media bytes remain outside Kafka. Streaming FFmpeg normalizes video to a bounded GOP, emits independently decodable HLS chunks, atomically exposes playlists and emits validated chunk metadata. Live streaming clients must reconnect on pod termination; draining has a finite bound.
+Vert.x ingestion validates the endpoint's JSON Schema, verifies write access, stamps a security envelope, and publishes to the endpoint's Kafka topic. Images and video store their bytes privately; their extracted metadata follows the same event path. Invalid processing records have an error queue.
+
+Flink's standard Kafka source feeds a JSON Schema adapter. Declared fields become typed relational columns, including nested structs and arrays. Unconstrained values use VARIANT, and undeclared keys live in `_json_remainder VARIANT` at the appropriate object level. Source datasets persist automatically; optional SQL views can write additional Iceberg tables and Kafka change streams. See the [precise mapping contract](json-schema-storage.md).
+
+Iceberg format-version 3 tables live in RustFS object storage. Polaris manages the REST catalog and vends storage credentials to service identities. Warehouse files, media, and recovery state use separate private buckets. PostgreSQL supports authorization, catalog, and connector services.
+
+The serving API discovers registered Iceberg schemas and uses DuckDB with `iceberg` and `cache_httpfs`. It restricts inputs to the caller's authorized rows before running SQL, then rechecks before returning. The bundle compiler derives GraphQL query types from SQL results, mutation inputs from JSON Schema, and subscription types from dataset/view schemas. Nested and VARIANT values are returned through JSON scalars.
+
+Mutations enter Kafka through authenticated ingestion and return acceptance receipts. Subscriptions use shared Kafka consumers and per-emission authorization over `graphql-transport-ws` with Reactor Flux. Private catalog and object-store credentials are not exposed to callers.
+
+## Application definitions
+
+The harness compiles JSON Schema, Flink SQL, serving SQL, and operation bindings into a versioned bundle. It creates endpoint definitions, topic bindings, typed source adapters, table schemas, SQL job definitions, and GraphQL definitions. New documents do not need domain entity fields; their permission resource binding is supplied separately.
+
+Each input dataset has one persistence owner. Jobs use explicit source bindings and application-defined SQL. Scope rules constrain transformations so an application cannot relabel private inputs as a public output. Tables are append-only in the current job writer; updating views require an explicit changelog contract.
+
+The reference configuration includes temporal measurement SQL, media metadata, and example connector datasets. Those are application definitions, not special storage kinds in the processor. No fixed aggregation DSL or node/edge projection runs alongside them.
 
 ## Task execution
 
-AX supplies task definitions, workspaces, and execution coordination. Substrate runs task images in isolated sandboxes. These services form the platform's task runtime, alongside the ingestion, processing, storage, and serving layers.
+AX owns task/workspace coordination, and Substrate runs isolated worker images. Applications define task behavior and delegate permissioned API access or scoped callbacks. Workers can ingest ordinary run events through configured endpoints.
 
-A task has an application-defined image, command, workspace, and delegated access contract. Application data is accessed through authenticated platform APIs. The caller's workspace and SpiceDB permissions continue to apply to reads and writes. Control-plane credentials belong to the deployment services; application tasks receive the access required for their work.
+Builder tasks can run the same `cg` compiler used by developers and CI. Release automation retains deployment credentials. The shipped workplace chat application uses a trusted model coordinator and an AX retrieval worker; it is one consumer of the platform. See [AX execution](ax.md).
 
-The application harness packages the schema and SQL compiler as task tooling. Builder tasks produce reviewable bundles describing ingestion APIs, Kafka topics, Flink jobs, Iceberg outputs, and GraphQL operations. Provisioning and release use those artifacts to install the application. Applications can ingest task events through ordinary schema-validated endpoints, including the supplied trajectory endpoint.
+## Deployment and operations
 
-The shipped chat application demonstrates task execution with a retrieval coordinator. Every question creates an AX task, uses scoped callbacks to retrieve through the original user's identity, and streams an answer after checking evidence and citations. DeepSeek planning and synthesis belong to that application's coordinator. Other applications supply their own task logic, model access, and result presentation.
+Flink runs as native Kubernetes JobManager/TaskManager Deployments, without a custom operator. Incremental RocksDB checkpoints, one concurrent checkpoint, a minimum pause, retained externalized checkpoints, and savepoints use private object storage. The replacement job has a fresh HA identity and does not restore the removed job's state.
 
-The AX control plane, Substrate workers, application coordinator, and frontend are separate deployment units. Worker-pool capacity and coordinator admission are configured together; waiting work emits progress. The coordinator tracks the run, validates completion, revokes its delegated capability, and requests task cleanup. Operational metrics record request outcomes, duration, and model-call status without source content or credentials as labels.
+The independent control plane is read-only and observes Kubernetes, Flink REST, configured APIs/queries, and Prometheus metrics. Stateless APIs support readiness and draining. Stateful data continuity across application releases is a separate concern from pod availability. Local single-node PostgreSQL and object storage remain single points of failure.
 
-See [AX task execution](ax.md) for the component diagram, permissions, task lifecycle, builder workflow, configuration, and operating commands.
-
-## Event contract
-
-All ingestion topics contain JSON objects with fields: eventId (UUID string), schemaVersion (integer, 2), endpoint (string), kind (json|image|video), entityId (string), eventTime (ISO-8601 UTC string), ingestedAt (ISO-8601 UTC string), payload (arbitrary JSON object), security:{workspaceId,resourceId,subjectId}. Servers derive and verify security provenance. Kafka key = workspaceId + NUL + resourceId. For JSON, entityId is required and eventTime may be supplied in the original body; payload preserves the original body. Default endpoint paths: POST /ingest/events -> cg.secure.events, POST /ingest/images -> cg.secure.images, POST /ingest/video -> cg.secure.video. Media entityId is required through X-Entity-Id; bearer identity and workspace authorization are mandatory; video stream ID and playlist returned through response headers. Image payload includes uri, width, height, contentType, bytes, sha256. Video payload includes streamId, sequence, uri, playlistUri, durationSeconds and keyframeAligned. Media URIs use /media/... and private RustFS objects; /data/media is bounded pod-local FFmpeg staging. Server-owned sidecars bind each file to its entity; every file/range/playlist request verifies identity and current permission. Media transfers stop on token expiry or observed revocation; nginx proxies media to ingestion rather than serving a file alias.
-
-Example JSON payload: {"entityId":"sensor-01","eventTime":"2026-09-24T18:00:00Z","value":23.4,"metric":"temperature","relatedTo":"room-01"}. Unknown fields are retained. Error records have their own JSON schema. Processing outputs have explicit output schemas and must be validated before Kafka.
-
-## Processing and durable tables
-
-Configuration defines sources, JSON-path projections and transformations, temporal windows and outputs. Use the upstream Kafka connector with string/byte deserialization and JSON Schema validation; arbitrary payloads do not require a fork. Revalidate messages at the Flink boundary. Preserve raw payload in STRING and build typed projections for relational operations. Watermarks + idleness handle event-time windows; route malformed/late data explicitly. Stable operator IDs and bounded state support restoration.
-
-Polaris REST catalog `context` at `https://polaris:8443/api/catalog`, namespace `context_secure`, stores table files in `s3://context-warehouse`. Polaris vends scoped temporary storage credentials to separate Flink writer and serving reader identities. All tables additionally require workspace_id and resource_id; edges also require target_resource_id. Tables: events(event_id, entity_id, endpoint, kind, event_time, ingested_at, payload), metrics(entity_id, metric, window_start, window_end, sample_count, sum_value, avg_value, min_value, max_value), nodes(node_id, node_type, event_time, source_event_id, properties), edges(edge_id, source_id, target_id, relation, event_time, source_event_id, properties). Event time table columns are timestamps; properties and payload are JSON strings. Append semantics preserve history. Graph views resolve latest versions, rather than imply arbitrary JSON automatically has semantic relationships.
-
-Live metric topic cg.secure.metrics uses the metrics column names. cg.secure.nodes and cg.secure.edges carry matching graph columns. Results have deterministic identities (entity + metric + window for metrics) so clients can deduplicate retries. Kafka and Iceberg commits are separate transactions: each sink's delivery semantics must be documented; there is no cross-system atomicity.
-
-Flink latest stable 2.3.0 confirmed at https://flink.apache.org/downloads/. This build uses Kafka connector 5.0.0-2.2 and Iceberg runtime 2.1 / 1.11.0, with real Flink 2.3 pipeline and recovery validation. Prefer stock connectors if integration passes, otherwise document/build the required source adaptation. Never silently downgrade the engine.
-
-## Queries and subscriptions
-
-Query service discovers schemas through the private Polaris REST catalog and exposes only registered, labeled secure table schemas. Schema access requires view_schema; physical metadata paths and legacy table names are not returned. Immutable schema/query snapshots generate typed GraphQL fields. Trusted JSON/YAML query definitions contain parameterized DuckDB SQL, argument declarations, result shapes, and Kafka subscription topic/filter mappings. User input binds values, never SQL identifiers. Before any configurable aggregate or join, fully consistent entity checks build an allowlist and materialize only workspace-scoped authorized source rows, requiring both edge endpoints. Federated YAML `sources` join independently authorized inputs in a fresh credential-free DuckDB database. Raw sources/catalog handles are removed and DuckDB external access is disabled; SQL is restricted to a single SELECT/CTE. Contributor permissions are checked again before results leave the service. Row/resource/memory/time limits fail the whole query on overflow. DuckDB loads iceberg and cache_httpfs; the private cache accelerates object reads without replacing per-request authorization. Query workers have bounded concurrency and run off the Vert.x event loop.
-
-/graphql requires verified OIDC bearer identity and workspace membership over HTTP and graphql-transport-ws. WebSocket initialization contains authorization and workspaceId; expiry closes the connection. Every live emission checks canonical labels, workspace access and current entity permissions; no positive authorization cache exists. Kafka consumer group is unique per query replica so every replica receives events for its local clients; per-operation Reactor Flux filtering uses entityId (or entity_id) and configured topic. Bounded queues, cancellation cleanup, read_committed, ping/pong and reconnect handling. Matching topic/entity filters never replace authorization. Slow clients are disconnected, never buffered indefinitely. Historical queries read Iceberg; live subscriptions read Kafka and may lead committed Iceberg snapshots by a checkpoint interval. No implicit exactly-once browser delivery.
-
-## Deployments and state
-
-Stateless replicas: readiness, startup probes, maxUnavailable=0, maxSurge=1, disruption budgets, graceful drain. Stateful Flink: incremental RocksDB checkpoints, one concurrent checkpoint, minimum pause and timeout, retained externalized checkpoints, S3 checkpoint/savepoint paths and verified native-format S3 savepoints. Native Kubernetes JobManager/TaskManager deployments, savepoint-based restoration, and HA metadata. Do not label restart-based job upgrades as uninterrupted output. Kafka buffers input while jobs recover. For continuous output across incompatible transformations, deploy a second version with independent group, output topics/tables, warm it to matching watermarks, switch query configuration, then retire old version. Never run two unrelated writers with the same transactional ID prefix.
-
-Single-node local storage and a single PostgreSQL authorization datastore remain development availability limits. Kafka has three SASL_SSL brokers and role-separated ACLs, but replicas share the local storage node. Zero loss/zero interruption during node failure requires replicated Kafka, durable shared storage and sufficient cluster capacity. Established video uploads and websocket connections may reconnect during rollout.
-
-## Validation
-
-Compile and unit tests for schema validation, keyframe segment checks, temporal aggregation and state behavior, subscription routing and query parameter binding. Integration smoke covers generated JSON/images/video -> Kafka -> Flink -> Iceberg/DuckDB + GraphQL subscriptions. Load generators expose rate/concurrency/duration and video GOP controls. Deployment tests distinguish manifest rendering, container build, and actual cluster execution.
-
-See [security validation](security-validation.md) for current authorization evidence. Earlier unsecured pipeline benchmarks establish functional compatibility only, not secure-mode throughput or availability.
+The previous fixed-table model is removed. There is no migration runner or old-table compatibility adapter in the replacement processor.

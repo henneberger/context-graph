@@ -1,5 +1,7 @@
 # Authorization validation
 
+Historical validation of the pre-schema runtime. Its graph-specific results do not apply to the current storage contract. Run `scripts/schema-smoke.py` for the native VARIANT round trip; the updated broader security suite requires a fresh run.
+
 The secure deployment runs in Kubernetes context `docker-desktop`, namespace `context-graph`. The previous unlabeled Flink deployment is suspended and its storage retained. Secure records use new Kafka topics and the `context_secure` Iceberg namespace.
 
 Verified against running services (not mocked authorization):

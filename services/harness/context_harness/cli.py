@@ -20,7 +20,7 @@ def main():
         elif args.command=='init':
             import shutil
             from .compiler import ROOT
-            shutil.copytree(ROOT/'examples/group-insights',args.directory);print('Created editable bundle at '+args.directory)
+            shutil.copytree(ROOT/'examples/schema-data',args.directory);print('Created editable bundle at '+args.directory)
         elif args.command=='inspect':
             b=json.loads((Path(args.release)/'bundle.json').read_text());print(json.dumps({k:b[k] for k in ('release','workspace','namespace','inputs','jobs')},indent=2))
         elif args.command=='render':

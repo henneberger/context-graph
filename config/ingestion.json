@@ -17,7 +17,9 @@
       "name": "events",
       "kind": "json",
       "topic": "cg.secure.events",
-      "schema": "schemas/event-input.json"
+      "schema": "schemas/event-input.json",
+      "resourcePointer": "",
+      "eventTimePointer": "/eventTime"
     },
     {
       "path": "/ingest/images",
@@ -38,14 +40,18 @@
       "name": "slack",
       "kind": "json",
       "topic": "cg.secure.slack",
-      "schema": "schemas/document-input.json"
+      "schema": "schemas/document-input.json",
+      "resourcePointer": "/entityId",
+      "eventTimePointer": "/eventTime"
     },
     {
       "path": "/ingest/github",
       "name": "github",
       "kind": "json",
       "topic": "cg.secure.github",
-      "schema": "schemas/document-input.json"
+      "schema": "schemas/document-input.json",
+      "resourcePointer": "/entityId",
+      "eventTimePointer": "/eventTime"
     }
   ]
 }

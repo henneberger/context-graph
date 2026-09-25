@@ -11,7 +11,7 @@ Every Kafka emission checks workspace, canonical resource provenance, token expi
 Only `registeredTables` with required security columns are exposed. Legacy/unlabeled tables do not appear in schema discovery or generated GraphQL fields. Schema discovery requires view_schema and never returns physical metadata paths. Configured and generated table queries use the same authorization path:
 
 1. Scan candidate resource IDs only in the selected workspace; verify provenance and current grants.
-2. Construct an allowlist, including both endpoints for edges; materialize authorized source rows before evaluating any configured aggregate/limit/join.
+2. Construct an allowlist, including additional resources only where explicitly registered by policy; materialize authorized source rows before evaluating any configured aggregate/limit/join.
 3. Remove the raw view and allowlist, disable DuckDB external access, and lock configuration. Execute a restricted single SELECT/CTE against source.
 4. Recheck workspace and contributor permissions before returning results.
 

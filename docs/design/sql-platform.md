@@ -1,6 +1,6 @@
 # SQL-backed context platform and derived application API
 
-Status: architecture decision and implementation specification, September 2026. This document defines the replacement for the current fixed `aggregations` configuration, handwritten GraphQL operation signatures, and Flink Kubernetes operator deployment. **The running implementation has not yet been migrated.** Examples below describe the target contract, not configuration accepted by today's runtime.
+Status: design direction for SQL-defined processing and APIs. The implemented JSON Schema/VARIANT storage contract is documented in [schema storage](../json-schema-storage.md). This document also includes proposed capabilities beyond the current runtime.
 
 The user-selected mutation model is **Kafka commands/events with processing status**. Application writes will not become direct transactional writes to DuckDB, Iceberg, or PostgreSQL.
 
@@ -243,7 +243,7 @@ The control plane reads ordinary Kubernetes workload status, the bundle inventor
 |---|---|---|
 | Operation compiler | `services/query/QueryService`, `IcebergQueries`, `SafeSql`, `config/queries.yaml` | Result types match prepared SQL metadata; generated mutations/subscriptions validate; invalid candidates preserve active schema |
 | Parameter/cursor execution | `IcebergQueries.bind`, resolver wiring | Quoted strings/comments/casts handled correctly; concurrent aliases isolated; cursor tampering, scope reuse, and expiry rejected |
-| SQL processing | `services/processor/JobConfig`, `ContextGraphJob`, `Transforms`, `IcebergTables`, `config/jobs*.yaml` | SQL window/join/filter cases; at least two jobs; both StatementSet sinks active; invalid schema and unsafe lineage rejected |
+| SQL processing | `services/processor/SqlBundleJob`, `JsonSchemaRows`, `GenericIceberg`, `config/jobs.yaml` | SQL window/join/filter cases; at least two jobs; both StatementSet sinks active; invalid schema and unsafe lineage rejected |
 | Mutation ingestion/status | Shared security/ingestion boundary plus new command contracts | Denied write produces no command; same-key retry and conflicting payload behavior; crash/restart dedup; APPLIED waits for visible commit |
 | Live routing | `LiveBus`, `EventAuthorization`, WebSocket handlers | Disjoint-user isolation; revocation; slow clients; cancellation; expiry; reconnect with explicit gap semantics |
 | Deployment | `deploy/k8s/flink.yaml`, `scripts/deploy.sh`, renderer, wait/version/upgrade scripts, policies and RBAC | Fresh deployment needs no Flink CRDs; multi-job restart/savepoint/restore; rollback; metrics and control visibility |

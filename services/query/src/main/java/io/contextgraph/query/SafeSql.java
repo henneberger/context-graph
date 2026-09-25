@@ -5,7 +5,7 @@ import java.util.regex.*;
 
 /** Restricted trusted query language; external access is also disabled by DuckDB. */
 final class SafeSql {
-  private static final Set<String> FUNCTIONS=Set.of("COUNT","SUM","AVG","MIN","MAX","ROW_NUMBER","RANK","DENSE_RANK","COALESCE","NULLIF","CAST","TRY_CAST","ROUND","ABS","FLOOR","CEIL","LOWER","UPPER","LENGTH","DATE_TRUNC","TIME_BUCKET","EXTRACT","GREATEST","LEAST","OVER","PARTITION","FILTER","IN","AS","EXCLUDE","FROM","SELECT","WHERE","AND","OR","NOT","ON","HAVING","WHEN");
+  private static final Set<String> FUNCTIONS=Set.of("STRUCT_PACK","JSON_EXTRACT","JSON_EXTRACT_STRING","COUNT","SUM","AVG","MIN","MAX","ROW_NUMBER","RANK","DENSE_RANK","COALESCE","NULLIF","CAST","TRY_CAST","ROUND","ABS","FLOOR","CEIL","LOWER","UPPER","LENGTH","DATE_TRUNC","TIME_BUCKET","EXTRACT","GREATEST","LEAST","OVER","PARTITION","FILTER","IN","AS","EXCLUDE","FROM","SELECT","WHERE","AND","OR","NOT","ON","HAVING","WHEN");
   static void validate(String sql) { validate(sql,Set.of("source")); }
   static void validate(String sql,Set<String> allowedSources) {
     if(sql==null||sql.length()>32000||sql.contains(";")||sql.contains("--")||sql.contains("/*")||sql.contains("\"")) throw new IllegalArgumentException("Only a single restricted SELECT/CTE is allowed");

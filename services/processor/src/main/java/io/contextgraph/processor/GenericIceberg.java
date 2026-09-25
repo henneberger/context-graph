@@ -14,47 +14,75 @@ public final class GenericIceberg {
   public static void requireSupported(Schema schema) {
     for(String column:List.of("workspace_id","resource_id","entity_id"))
       if(schema.findField(column)==null||schema.findType(column).typeId()!=org.apache.iceberg.types.Type.TypeID.STRING)throw new IllegalArgumentException("Output must preserve "+column);
-    for(var f:schema.columns()) {
-      if(!f.name().matches("[a-z][a-z0-9_]*"))throw new IllegalArgumentException("Output requires simple unique lowercase aliases");
-      if(!Set.of(org.apache.iceberg.types.Type.TypeID.STRING,org.apache.iceberg.types.Type.TypeID.INTEGER,org.apache.iceberg.types.Type.TypeID.LONG,
-        org.apache.iceberg.types.Type.TypeID.FLOAT,org.apache.iceberg.types.Type.TypeID.DOUBLE,org.apache.iceberg.types.Type.TypeID.BOOLEAN,
-        org.apache.iceberg.types.Type.TypeID.TIMESTAMP).contains(f.type().typeId()))throw new IllegalArgumentException("Explicitly cast unsupported output type: "+f.name());
+    for(var f:schema.columns()) requireType(f.type());
+  }
+  private static void requireType(org.apache.iceberg.types.Type type) {
+    switch(type.typeId()) {
+      case STRUCT -> type.asStructType().fields().forEach(f->requireType(f.type()));
+      case LIST -> requireType(type.asListType().elementType());
+      case MAP -> {requireType(type.asMapType().keyType());requireType(type.asMapType().valueType());}
+      case STRING, INTEGER, LONG, FLOAT, DOUBLE, BOOLEAN, TIMESTAMP, DECIMAL, VARIANT -> {}
+      default -> throw new IllegalArgumentException("Unsupported output type: "+type);
     }
   }
   public static String encode(Row row,Schema schema,String workspace) {
     if(row.getKind()!=org.apache.flink.types.RowKind.INSERT)throw new IllegalArgumentException("Append-only output required");
-    var node=Json.object();
-    for(int i=0;i<schema.columns().size();i++) {
-      Object value=row.getField(i);String name=schema.columns().get(i).name();
-      if(value instanceof LocalDateTime t)value=t.toInstant(ZoneOffset.UTC).toString();
-      else if(value instanceof Instant t)value=t.toString();
-      else if(value instanceof java.sql.Timestamp t)value=t.toInstant().toString();
-      node.set(name,Json.MAPPER.valueToTree(value));
-    }
+    var node=object(row,schema.asStruct());
     if(!workspace.equals(node.path("workspace_id").asText())||!Scope.resource(workspace,node.path("entity_id").asText()).equals(node.path("resource_id").asText()))
       throw new IllegalArgumentException("Invalid SQL output scope");
-    // Validate against the derived schema, including nullability and primitive value kinds.
-    for(var f:schema.columns()) {
-      var v=node.get(f.name());if(v.isNull()){if(f.isRequired())throw new IllegalArgumentException("Required output: "+f.name());continue;}
-      boolean valid=switch(f.type().typeId()) {
-        case STRING,TIMESTAMP->v.isTextual();case BOOLEAN->v.isBoolean();case INTEGER,LONG->v.isIntegralNumber();
-        case FLOAT,DOUBLE->v.isNumber()&&Double.isFinite(v.asDouble());default->false;
-      };if(!valid)throw new IllegalArgumentException("Invalid output: "+f.name());
-    }
     return node.toString();
   }
-  static RowData row(String value,Schema schema) {
-    var n=Json.read(value);var result=new GenericRowData(schema.columns().size());
-    for(int i=0;i<schema.columns().size();i++) {var f=schema.columns().get(i);var v=n.get(f.name());if(v==null||v.isNull()){result.setField(i,null);continue;}
-      result.setField(i,switch(f.type().typeId()) {case STRING->StringData.fromString(v.asText());case TIMESTAMP->TimestampData.fromInstant(Instant.parse(v.asText()));
-        case INTEGER->v.asInt();case LONG->v.asLong();case FLOAT->(float)v.asDouble();case DOUBLE->v.asDouble();case BOOLEAN->v.asBoolean();default->throw new IllegalArgumentException();});
-    }return result;
+  private static com.fasterxml.jackson.databind.node.ObjectNode object(Row row,org.apache.iceberg.types.Types.StructType type) {
+    if(row.getArity()!=type.fields().size())throw new IllegalArgumentException("Row/schema arity mismatch");
+    var out=Json.object();
+    for(int i=0;i<row.getArity();i++){var f=type.fields().get(i);Object value=row.getField(i);
+      if(value==null&&f.isRequired())throw new IllegalArgumentException("Required output: "+f.name());
+      out.set(f.name(),json(value,f.type()));}
+    return out;
   }
+  private static com.fasterxml.jackson.databind.JsonNode json(Object value,org.apache.iceberg.types.Type type) {
+    if(value==null)return com.fasterxml.jackson.databind.node.NullNode.instance;
+    return switch(type.typeId()) {
+      case VARIANT -> Json.read(((org.apache.flink.types.variant.Variant)value).toJson());
+      case STRUCT -> object((Row)value,type.asStructType());
+      case LIST -> {var out=Json.MAPPER.createArrayNode();for(Object item:(Object[])value)out.add(json(item,type.asListType().elementType()));yield out;}
+      case MAP -> {var out=Json.object();((Map<?,?>)value).forEach((k,v)->out.set(k.toString(),json(v,type.asMapType().valueType())));yield out;}
+      case TIMESTAMP -> Json.MAPPER.valueToTree(value instanceof LocalDateTime t?t.toInstant(ZoneOffset.UTC).toString():value.toString());
+      case STRING -> {if(!(value instanceof String))throw new IllegalArgumentException("String required");yield Json.MAPPER.valueToTree(value);}
+      case BOOLEAN -> {if(!(value instanceof Boolean))throw new IllegalArgumentException("Boolean required");yield Json.MAPPER.valueToTree(value);}
+      case INTEGER,LONG -> {if(!(value instanceof Byte||value instanceof Short||value instanceof Integer||value instanceof Long))throw new IllegalArgumentException("Integer required");yield Json.MAPPER.valueToTree(value);}
+      case FLOAT,DOUBLE,DECIMAL -> {if(!(value instanceof Number n)||!Double.isFinite(n.doubleValue()))throw new IllegalArgumentException("Finite number required");yield Json.MAPPER.valueToTree(value);}
+      default -> throw new IllegalArgumentException("Unsupported output type: "+type);
+    };
+  }
+  static RowData row(String value,Schema schema) {
+    return (RowData)internal(Json.read(value),schema.asStruct());
+  }
+  private static Object internal(com.fasterxml.jackson.databind.JsonNode value,org.apache.iceberg.types.Type type) {
+    if(value==null)return null;
+    if(type.typeId()==org.apache.iceberg.types.Type.TypeID.VARIANT)return JsonSchemaRows.variant(value);
+    if(value.isNull())return null;
+    return switch(type.typeId()) {
+      case STRING -> StringData.fromString(value.asText());
+      case TIMESTAMP -> TimestampData.fromInstant(Instant.parse(value.asText()));
+      case INTEGER -> value.intValue();case LONG -> value.longValue();case FLOAT -> value.floatValue();case DOUBLE -> value.doubleValue();case BOOLEAN -> value.booleanValue();
+      case DECIMAL -> {var t=(org.apache.iceberg.types.Types.DecimalType)type;var decimal=DecimalData.fromBigDecimal(value.decimalValue(),t.precision(),t.scale());if(decimal==null)throw new IllegalArgumentException("Decimal overflow");yield decimal;}
+      case VARIANT -> JsonSchemaRows.variant(value);
+      case STRUCT -> {var fields=type.asStructType().fields();var row=new GenericRowData(fields.size());for(int i=0;i<fields.size();i++)row.setField(i,internal(value.get(fields.get(i).name()),fields.get(i).type()));yield row;}
+      case LIST -> {Object[] items=new Object[value.size()];for(int i=0;i<items.length;i++)items[i]=internal(value.get(i),type.asListType().elementType());yield new GenericArrayData(items);}
+      case MAP -> {Map<Object,Object> entries=new LinkedHashMap<>();value.fields().forEachRemaining(e->entries.put(StringData.fromString(e.getKey()),internal(e.getValue(),type.asMapType().valueType())));yield new GenericMapData(entries);}
+      default -> throw new IllegalArgumentException("Unsupported output type: "+type);
+    };
+  }
+
   static void attach(org.apache.flink.streaming.api.datastream.DataStream<String> values,Schema schema,String tableName,String namespace,int parallelism,String uid) {
-    var loader=IcebergTables.loader(ContextGraphJob.env("WAREHOUSE_URI","file:///tmp/context-warehouse"));var catalog=loader.loadCatalog();var id=TableIdentifier.of(namespace,tableName);
+    attach(values,schema,tableName,namespace,parallelism,uid,RuntimeSupport.env("WAREHOUSE_URI","file:///tmp/context-warehouse"));
+  }
+  static void attach(org.apache.flink.streaming.api.datastream.DataStream<String> values,Schema schema,String tableName,String namespace,int parallelism,String uid,String warehouse) {
+    var loader=IcebergTables.loader(warehouse);var catalog=loader.loadCatalog();var id=TableIdentifier.of(namespace,tableName);
     org.apache.iceberg.Table table;
     if(catalog.tableExists(id)){table=catalog.loadTable(id);if(!table.schema().sameSchema(org.apache.iceberg.types.TypeUtil.reassignIds(schema,table.schema())))throw new IllegalArgumentException("Version incompatible output table: "+id);}
-    else table=catalog.createTable(id,schema,PartitionSpec.builderFor(schema).identity("workspace_id").build(),Map.of("format-version","2","write.target-file-size-bytes","134217728"));
+    else table=catalog.createTable(id,schema,PartitionSpec.builderFor(schema).identity("workspace_id").build(),Map.of("format-version","3","write.target-file-size-bytes","134217728"));
     var rows=values.map(v->row(v,schema)).returns(org.apache.flink.table.runtime.typeutils.InternalTypeInfo.of(FlinkSchemaUtil.convert(schema)));
     FlinkSink.forRowData(rows).table(table).tableLoader(TableLoader.fromCatalog(loader,id)).writeParallelism(parallelism).uidPrefix("iceberg-"+uid).append();
   }

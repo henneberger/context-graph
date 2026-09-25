@@ -16,10 +16,11 @@ class ContextClient:
         r.raise_for_status();result=r.json()
         if result.get('errors'):raise RuntimeError('Query denied or unavailable')
         return result['data']
-    def ingest(self,endpoint,event):
+    def ingest(self,endpoint,event,resource_key):
         import re
         if not re.fullmatch(r'[a-z][a-z0-9_]*',endpoint):raise ValueError('Invalid endpoint')
-        r=requests.post(self.ingestion_url+'/ingest/'+endpoint,json=event,headers=self.headers(),verify=self.ca_file,timeout=(5,45),allow_redirects=False)
+        headers={**self.headers(),'X-Resource-Key':resource_key}
+        r=requests.post(self.ingestion_url+'/ingest/'+endpoint,json=event,headers=headers,verify=self.ca_file,timeout=(5,45),allow_redirects=False)
         r.raise_for_status();return r.json()
     def trajectory(self,entity_id,run_id,event_type,details=None):
-        return self.ingest('trajectories',{'entityId':entity_id,'runId':run_id,'eventType':event_type,'details':details or {}})
+        return self.ingest('trajectories',{'entityId':entity_id,'runId':run_id,'eventType':event_type,'details':details or {}},resource_key=entity_id)

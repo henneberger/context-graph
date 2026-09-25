@@ -195,7 +195,7 @@ def run(args):
         try:
             if args.mode == "json":
                 payload = json_payload(args, sequence, random.Random(args.seed + sequence))
-                upload(args.url, args.path, json.dumps(payload).encode(), "application/json", headers=auth_headers(args), ca=args.ca, allow_http=args.allow_http)
+                upload(args.url, args.path, json.dumps(payload).encode(), "application/json", headers={**auth_headers(args),"X-Resource-Key":payload["entityId"]}, ca=args.ca, allow_http=args.allow_http)
             elif args.mode == "images":
                 upload(args.url, args.path, content, "application/octet-stream", entity_id(args, sequence), headers=auth_headers(args), ca=args.ca, allow_http=args.allow_http)
             else:

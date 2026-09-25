@@ -8,7 +8,11 @@ class DocumentSearchTest {
   final SecurityContext user=new SecurityContext("alice","knowledge",Instant.now().getEpochSecond()+300);
   final String resource=AccessControl.resourceId("knowledge","repo");
   class Grants implements PermissionChecks {boolean revoked=false;public void workspace(SecurityContext c,String p){if(revoked)throw new SecurityException();}public boolean allowed(SecurityContext c,String r){return !revoked&&resource.equals(r);}}
-  Map<String,Object> row(String id,String title,String body,String time,boolean deleted){return Map.of("workspace_id","knowledge","entity_id","repo","resource_id",resource,"endpoint","github","event_id",time,"ingested_at",time,"payload",Map.of("documentId",id,"source","github","title",title,"text",body,"url","https://github.com/MariHQ/mari/issues/1","observedAt",time,"deleted",deleted));}
+  Map<String,Object> row(String id,String title,String body,String time,boolean deleted){
+    var row=new LinkedHashMap<String,Object>();
+    row.putAll(Map.of("workspace_id","knowledge","entity_id","repo","resource_id",resource,"event_id",time,"ingested_at",time));
+    row.putAll(Map.of("documentId",id,"source","github","title",title,"text",body,"url","https://github.com/MariHQ/mari/issues/1","observedAt",time,"deleted",deleted));return row;
+  }
   @BeforeAll static void extensions()throws Exception{try(var c=IcebergQueries.connect(true)) {}}
   @Test void latestVersionAndTombstoneWin()throws Exception {
     var docs=List.of(row("one","secret old","obsolete","2026-01-01",false),row("one","current","latest","2026-02-01",false),row("two","deleted","remove","2026-01-01",false),row("two","removed","","2026-02-01",true));
@@ -27,8 +31,7 @@ class DocumentSearchTest {
     var old=new HashMap<>(row("old","Recovery fix","Recovery fix detail", "2026-01-01",false));
     var fresh=new HashMap<>(row("new","Recovery fix","Recovery fix detail", "2026-01-01",false));
     for(var entry:List.of(old,fresh)) {
-      @SuppressWarnings("unchecked") var payload=new HashMap<>((Map<String,Object>)entry.get("payload"));
-      payload.put("documentType","commit");payload.put("updatedAt",Instant.now().minusSeconds(entry==old?86400L*365:0).toString());entry.put("payload",payload);
+      entry.put("documentType","commit");entry.put("updatedAt",Instant.now().minusSeconds(entry==old?86400L*365:0).toString());
     }
     var hits=DocumentSearch.execute(List.of(old,fresh),Map.of("query","Recovery","limit",2),false,user,new Grants());
     assertEquals("new",hits.getFirst().get("id"));assertTrue(((Number)hits.getFirst().get("score")).doubleValue()>((Number)hits.getLast().get("score")).doubleValue());

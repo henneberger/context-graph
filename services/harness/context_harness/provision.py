@@ -42,7 +42,7 @@ def provision(b,context):
       'acl() { "$K/kafka-acls.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --add "$@" >/dev/null; }']
     for role in credentials:
         lines.append('"$K/kafka-configs.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --alter --entity-type users --entity-name '+release+'-'+role+' --add-config "SCRAM-SHA-512=[iterations=8192,password=$'+role.upper()+']" >/dev/null')
-    output_topics=[v['topic'] for j in b['jobs'] for v in j['views']]
+    output_topics=[v['topic'] for j in b['jobs'] for v in j['views']]+[v['changeTopic'] for j in b['jobs'] for v in j['sources']]
     for topic in list(b['inputs'].values())+output_topics+[b['errorTopic']]:
         lines.append('"$K/kafka-topics.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --create --if-not-exists --topic '+topic+' --partitions 3 --replication-factor 3 --config min.insync.replicas=2 --config retention.ms=604800000 >/dev/null')
         if topic in b['inputs'].values():grants=[('ingestion','Write'),('processor','Read')]
@@ -93,4 +93,4 @@ def catalog(b,context,directory):
             schema=description['schema']
             request('POST','/api/catalog/v1/context/namespaces/'+ns+'/tables',{'name':view,'schema':schema,
                 'partition-spec':{'spec-id':0,'fields':[{'source-id':next(f['id'] for f in schema['fields'] if f['name']=='workspace_id'),'field-id':1000,'name':'workspace_id','transform':'identity'}]},
-                'properties':{'format-version':'2','write.target-file-size-bytes':'134217728'}},True)
+                'properties':{'format-version':'3','write.target-file-size-bytes':'134217728'}},True)

@@ -10,7 +10,7 @@ import java.io.Serializable;
 import java.time.Instant;
 
 public final class Json {
-  public static final ObjectMapper MAPPER = new ObjectMapper();
+  public static final ObjectMapper MAPPER = new ObjectMapper().enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
   public static JsonNode read(String s) {
     try { return MAPPER.readTree(s); } catch (Exception e) { throw new IllegalArgumentException("Invalid JSON", e); }
   }
@@ -25,7 +25,7 @@ public final class Json {
     private transient JsonSchema schema;
     public Validator(String definition) { this.definition = definition; }
     public JsonNode validate(String value) {
-      if (schema == null) schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(definition);
+      if (schema == null) schema = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(definition, com.networknt.schema.SchemaValidatorsConfig.builder().formatAssertionsEnabled(true).build());
       JsonNode node = read(value);
       var errors = schema.validate(node);
       if (!errors.isEmpty()) throw new IllegalArgumentException(errors.toString());

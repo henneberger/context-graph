@@ -10,9 +10,18 @@ import java.util.*;
 /** Build-time generation using engine metadata on empty typed tables, never sampled user data. */
 public final class ApiCompiler {
   private static final ObjectMapper JSON=new ObjectMapper();
-  static String name(String s){if(!s.matches("[A-Za-z][A-Za-z0-9_]{0,63}"))throw new IllegalArgumentException("Invalid API identifier");return s;}
-  static String sqlType(String type){return switch(type){case "int"->"INTEGER";case "long"->"BIGINT";case "float","double"->"DOUBLE";case "boolean"->"BOOLEAN";case "timestamp","timestamptz"->"TIMESTAMP";case "string"->"VARCHAR";default->throw new IllegalArgumentException("Unsupported output type");};}
-  static String graphType(String type){return switch(type){case "int"->"Int";case "long"->"Long";case "float","double"->"Float";case "boolean"->"Boolean";default->"String";};}
+  static String name(String s){if(!s.matches("[A-Za-z_][A-Za-z0-9_]{0,63}"))throw new IllegalArgumentException("Invalid API identifier");return s;}
+  static String sqlType(String type){return switch(type){case "int"->"INTEGER";case "long"->"BIGINT";case "float","double"->"DOUBLE";case "boolean"->"BOOLEAN";case "timestamp","timestamptz"->"TIMESTAMP";case "string"->"VARCHAR";case "variant"->"VARIANT";default->{if(type.matches("decimal\\([0-9]+, [0-9]+\\)")||type.matches("decimal\\([0-9]+,[0-9]+\\)"))yield type;throw new IllegalArgumentException("Unsupported output type: "+type);}};}
+  static String sqlType(JsonNode type) {
+    if(type.isTextual())return sqlType(type.asText());
+    return switch(type.path("type").asText()) {
+      case "struct" -> {var fields=new ArrayList<String>();for(var f:type.path("fields"))fields.add("\""+f.path("name").asText().replace("\"","\"\"")+"\" "+sqlType(f.path("type")));yield "STRUCT("+String.join(",",fields)+")";}
+      case "list" -> sqlType(type.path("element"))+"[]";
+      case "map" -> "MAP("+sqlType(type.path("key"))+","+sqlType(type.path("value"))+")";
+      default -> throw new IllegalArgumentException("Unsupported nested type: "+type);
+    };
+  }
+  static String graphType(String type){return switch(type){case "int"->"Int";case "long"->"Long";case "float","double"->"Float";case "boolean"->"Boolean";case "variant"->"JSON";default->type.startsWith("{")?"JSON":"String";};}
   public static void main(String[] args)throws Exception {
     JsonNode config=JSON.readTree(Path.of(args[0]).toFile());ObjectNode out=JSON.createObjectNode();
     ObjectNode registered=out.putObject("registeredTables"),queries=out.putObject("queries"),subscriptions=out.putObject("subscriptions"),mutations=out.putObject("mutations");
@@ -32,7 +41,7 @@ public final class ApiCompiler {
       }
       String outputType="Result_"+field;types.append("type ").append(outputType).append(" {\n");
       try(Connection c=IcebergQueries.connect(false);Statement s=c.createStatement()) {
-        var defs=new ArrayList<String>();for(var f:view.path("schema").path("fields"))defs.add(name(f.path("name").asText())+" "+sqlType(f.path("type").asText()));
+        var defs=new ArrayList<String>();for(var f:view.path("schema").path("fields"))defs.add(name(f.path("name").asText())+" "+sqlType(f.path("type")));
         s.execute("CREATE TABLE source ("+String.join(",",defs)+")");s.execute("SET enable_external_access=false; SET lock_configuration=true");
         var bound=IcebergQueries.bind(sql,samples);try(var p=c.prepareStatement(bound.sql())) {
           for(int i=0;i<bound.values().size();i++)p.setObject(i+1,bound.values().get(i));
@@ -40,7 +49,7 @@ public final class ApiCompiler {
             for(int i=1;i<=meta.getColumnCount();i++){String label=name(meta.getColumnLabel(i));if(!labels.add(label))throw new IllegalArgumentException("Duplicate result label");
               String type=switch(meta.getColumnType(i)){case java.sql.Types.INTEGER,java.sql.Types.SMALLINT,java.sql.Types.TINYINT->"Int";case java.sql.Types.BIGINT->"Long";
                 case java.sql.Types.FLOAT,java.sql.Types.REAL,java.sql.Types.DOUBLE->"Float";case java.sql.Types.BOOLEAN,java.sql.Types.BIT->"Boolean";
-                case java.sql.Types.VARCHAR,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.DATE->"String";default->throw new IllegalArgumentException("Cast result type explicitly: "+label);};
+                case java.sql.Types.VARCHAR,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.DATE->"String";case java.sql.Types.STRUCT,java.sql.Types.ARRAY,java.sql.Types.JAVA_OBJECT,java.sql.Types.OTHER->"JSON";case java.sql.Types.DECIMAL,java.sql.Types.NUMERIC->"String";default->throw new IllegalArgumentException("Cast result type explicitly: "+label);};
               types.append(label).append(": ").append(type).append('\n');}
           }
         }
@@ -50,21 +59,23 @@ public final class ApiCompiler {
     for(var iter=config.path("api").path("subscriptions").fields();iter.hasNext();) {
       var entry=iter.next();String field=name(entry.getKey()),viewName=entry.getValue().path("view").asText();var view=views.get(viewName);if(view==null)throw new IllegalArgumentException("Unknown subscription view");
       String type="Change_"+field;types.append("type ").append(type).append(" {\n");
-      for(var f:view.path("schema").path("fields"))types.append(name(f.path("name").asText())).append(": ").append(graphType(f.path("type").asText())).append('\n');types.append("}\n");
+      for(var f:view.path("schema").path("fields"))types.append(name(f.path("name").asText())).append(": ").append(graphType(f.path("type").isTextual()?f.path("type").asText():f.path("type").toString())).append('\n');types.append("}\n");
       var sub=subscriptions.putObject(field);sub.put("signature",field+"(entityId: String): "+type+"!").put("entityField","entity_id");sub.putArray("topics").add(config.path("topics").path(viewName).asText());
     }
     for(var iter=config.path("api").path("mutations").fields();iter.hasNext();) {
       var entry=iter.next();String field=name(entry.getKey()),input=entry.getValue().path("input").asText();var schema=config.path("inputs").get(input);if(schema==null)throw new IllegalArgumentException("Unknown mutation input");
       String inputType=inputType(schema,"Input_"+field,types);var mutation=mutations.putObject(field);
-      mutation.put("signature",field+"(input: "+inputType+"!): CommandReceipt!").put("path","/ingest/"+input).set("schema",schema);
+      mutation.put("signature",field+"(resourceKey: String!, input: "+inputType+"!): CommandReceipt!").put("path","/ingest/"+input).set("schema",schema);
     }
     out.put("types",types.toString());new ObjectMapper(new YAMLFactory()).writeValue(Path.of(args[1]).toFile(),out);
   }
   static String inputType(JsonNode schema,String type,StringBuilder types) {
+    if(!schema.path("type").asText().equals("object")||!schema.has("properties"))return "JSON";
+    if(!schema.path("additionalProperties").isBoolean()||schema.path("additionalProperties").asBoolean()||schema.has("patternProperties")||schema.has("$ref"))return "JSON";
     var fields=new StringBuilder();Set<String> required=new HashSet<>();schema.path("required").forEach(v->required.add(v.asText()));
     for(var it=schema.path("properties").fields();it.hasNext();) {var f=it.next();if(f.getValue().isBoolean())continue;String field=name(f.getKey());JsonNode spec=f.getValue();String t=switch(spec.path("type").asText()) {
       case "string"->"String";case "integer"->"Long";case "number"->"Float";case "boolean"->"Boolean";
-      case "object"->spec.has("properties")?inputType(spec,type+"_"+field,types):"JSON";default->throw new IllegalArgumentException("Unsupported GraphQL input construct: "+field);};
+      case "object"->spec.has("properties")?inputType(spec,type+"_"+field,types):"JSON";case "array"->"JSON";default->"JSON";};
       fields.append(field).append(": ").append(t).append(required.contains(field)?"!":"").append('\n');
     }
     if(fields.length()==0)throw new IllegalArgumentException("Empty typed input");types.append("input ").append(type).append(" {\n").append(fields).append("}\n");return type;

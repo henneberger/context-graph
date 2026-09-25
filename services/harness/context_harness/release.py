@@ -4,7 +4,7 @@ from pathlib import Path
 import yaml,requests
 from .compiler import ROOT,Invalid,compile_bundle,identifier
 NS='context-graph'
-IMAGES={'ingestion':'context-graph/ingestion:harness-v1','query':'context-graph/query:harness-v3','processor':'context-graph/processor:harness-v2'}
+IMAGES={'ingestion':'context-graph/ingestion:schema-v1','query':'context-graph/query:schema-v1','processor':'context-graph/processor:schema-v1'}
 def kubectl(context,*args,**kwargs):return subprocess.run(['kubectl','--context',context,'-n',NS,*args],check=True,text=True,**kwargs)
 def load(path):return json.loads((Path(path)/'bundle.json').read_text())
 def meta(name,labels=None):return {'name':name,'namespace':NS,'labels':labels or {}}
@@ -38,7 +38,10 @@ def render(path,node):
             if volume.get('secret',{}).get('secretName')=='security-'+role:volume['secret']['secretName']=name
             if 'persistentVolumeClaim' in volume:volume.pop('persistentVolumeClaim');volume['emptyDir']={}
         docs.extend([d,svc(name,{'app':name},[('https',8080 if role=='ingestion' else 8081)])])
-    flink=next(d for d in yaml.safe_load_all((ROOT/'deploy/legacy/flink-operator.yaml').read_text()) if d and d['kind']=='FlinkDeployment')['spec']
+    native=next(d for d in yaml.safe_load_all((ROOT/'deploy/k8s/flink.yaml').read_text()) if d and d['kind']=='Deployment' and d['spec']['template']['metadata']['labels'].get('component')=='jobmanager')
+    template=native['spec']['template']
+    properties=next(e['value'] for e in template['spec']['containers'][0]['env'] if e['name']=='FLINK_PROPERTIES')
+    flink={'podTemplate':template,'flinkConfiguration':yaml.safe_load(properties)}
     for job in b['jobs']:
         cluster=job['name'];alias=cluster.removeprefix(release+'-');settings=copy.deepcopy(flink['flinkConfiguration'])
         settings={k:v for k,v in settings.items() if not k.startswith('kubernetes.operator.') and not k.startswith('kubernetes.jobmanager.') and not k.startswith('kubernetes.taskmanager.')}
@@ -52,7 +55,8 @@ def render(path,node):
             pod['metadata']['labels']={'app':cluster,'component':component,'context-graph-role':'processor','context-graph-bundle':release,'context-graph-control-plane':'true'}
             ps['nodeSelector']={'kubernetes.io/hostname':node};ps['serviceAccountName']='flink-runtime';c=ps['containers'][0];c['name']='flink';c['image']=IMAGES['processor']
             c['args']=['standalone-job','--job-classname','io.contextgraph.processor.SqlBundleJob','/app/config/'+alias+'.json'] if component=='jm' else ['taskmanager']
-            c['env'].append({'name':'JAVA_TOOL_OPTIONS','value':settings['env.java.opts.all']})
+            c['env']=[e for e in c['env'] if e['name'] not in ('JAVA_TOOL_OPTIONS','FLINK_PROPERTIES')]
+            c['env'].append(copy.deepcopy(next(e for e in template['spec']['containers'][0]['env'] if e['name']=='JAVA_TOOL_OPTIONS')))
             c['env'].append({'name':'FLINK_PROPERTIES','value':'\n'.join(k+': '+str(v) for k,v in settings.items() if k!='env.java.opts.all')})
             c['resources']={'requests':{'cpu':'100m','memory':'512Mi' if component=='jm' else '768Mi'},'limits':{'memory':'1Gi' if component=='jm' else '1280Mi'}}
             for e in c['env']:
@@ -61,6 +65,7 @@ def render(path,node):
                 if e['name']=='SAVEPOINT_URI':e['value']='s3://context-recovery/savepoints/'+cluster
                 ref=e.get('valueFrom',{}).get('secretKeyRef',{})
                 if ref.get('name')=='polaris-processor':ref['name']=release+'-catalog-processor'
+            c.pop('readinessProbe',None)
             if component=='jm':c['readinessProbe']={'httpGet':{'path':'/overview','port':8081},'periodSeconds':5,'timeoutSeconds':3}
             for v in ps['volumes']:
                 if 'configMap' in v:v['configMap']={'name':cm,'items':items}

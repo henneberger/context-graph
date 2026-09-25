@@ -15,7 +15,7 @@ m='/api/management/v1';c=m+'/catalogs/'+catalog
 req('POST',m+'/catalogs',{'catalog':{'name':catalog,'type':'INTERNAL','readOnly':False,'properties':{'default-base-location':'s3://context-warehouse/'},'storageConfigInfo':{'storageType':'S3','allowedLocations':['s3://context-warehouse/'],'endpoint':'https://object-storage:9000','pathStyleAccess':True,'region':'us-east-1','stsUnavailable':False,'kmsUnavailable':True}}},True)
 req('PUT',c+'/catalog-roles/catalog_admin/grants',{'type':'catalog','privilege':'CATALOG_MANAGE_CONTENT'})
 req('POST','/api/catalog/v1/context/namespaces',{'namespace':['context_secure']},True)
-for role,privileges in {'query':['NAMESPACE_LIST','TABLE_LIST','TABLE_READ_PROPERTIES','TABLE_READ_DATA'],'processor':['NAMESPACE_LIST','TABLE_LIST','TABLE_READ_PROPERTIES','TABLE_READ_DATA','TABLE_CREATE','TABLE_WRITE_DATA'],'migration':['CATALOG_MANAGE_CONTENT']}.items():
+for role,privileges in {'query':['NAMESPACE_LIST','TABLE_LIST','TABLE_READ_PROPERTIES','TABLE_READ_DATA'],'processor':['NAMESPACE_LIST','TABLE_LIST','TABLE_READ_PROPERTIES','TABLE_READ_DATA','TABLE_CREATE','TABLE_WRITE_DATA']}.items():
  name='context-'+role;f=root/('polaris-'+role+'.json')
  if not f.exists():
   result=req('POST',m+'/principals',{'principal':{'name':name},'credentialRotationRequired':False})
@@ -28,4 +28,4 @@ for role,privileges in {'query':['NAMESPACE_LIST','TABLE_LIST','TABLE_READ_PROPE
  result=json.loads(f.read_text());data=result['credentials']
  secret={'apiVersion':'v1','kind':'Secret','metadata':{'name':'polaris-'+role,'namespace':'context-graph'},'stringData':{'client-id':data['clientId'],'client-secret':data['clientSecret'],'credential':data['clientId']+':'+data['clientSecret']}}
  subprocess.run(['kubectl','--context',os.environ.get('KUBE_CONTEXT','docker-desktop'),'apply','-f','-'],input=json.dumps(secret),text=True,check=True,stdout=subprocess.DEVNULL)
-print('Polaris catalog and distinct read, write, migration roles configured.')
+print('Polaris catalog and distinct read and write roles configured.')

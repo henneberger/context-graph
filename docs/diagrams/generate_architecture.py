@@ -52,10 +52,10 @@ d.service(74,262,'Vert.x','vertx');d.service(408,262,'Kafka → Flink','flink');
 for x in [364,698,1032]:d.line([(x-8,317),(x+21,317)])
 d.lines(74,312,['JSON · images · live video','Schema-validated endpoints','Trusted resource labels'],17)
 d.lines(74,408,['Adapters / Temporal → endpoints','Per-endpoint topics + error queue'],16,TEAL)
-d.lines(408,312,['Parallel SQL / stream jobs','Entities · edges · observations','Event-time windows'],17)
+d.lines(408,312,['Parallel SQL / stream jobs','Schema rows + SQL views','Event-time windows'],17)
 d.lines(408,408,['Native Kubernetes deployments','Recovery state → private S3'],16,TEAL)
 d.logo('polaris',742,293,22);d.text(772,312,'Polaris REST catalog',17,MUTED);d.lines(742,339,['RustFS private S3 warehouse','Snapshots + schema metadata'],17)
-d.lines(742,408,['Service credential vending','Nodes, edges and event tables'],16,TEAL)
+d.lines(742,408,['Service credential vending','Typed columns + VARIANT'],16,TEAL)
 d.lines(1076,312,['iceberg + cache_httpfs','Authorized inputs → query SQL','Vert.x GraphQL API'],17)
 d.lines(1076,408,['SQL views → derived fields','Recheck before returning data'],16,TEAL)
 # Secondary paths are explicit routes, not confusing cross-page wires.
@@ -108,7 +108,7 @@ d.lines(56,901,['User → coordinator / DeepSeek planning → AX retrieval task 
 d.footer('Execution is shared infrastructure. Domain behavior belongs to each application; privileged release credentials stay outside task workers.')
 d.save()
 
-d=Diagram('permission-boundaries','Access follows the caller, all the way to results','The domain graph lives in Iceberg. SpiceDB holds the separate graph that determines who may see it.',1120)
+d=Diagram('permission-boundaries','Access follows the caller, all the way to results','JSON Schema defines application data. SpiceDB determines who can access each resource.',1120)
 d.rect(56,180,1328,110,'#f6f2fa')
 d.text(80,220,'OIDC identity',25,INK,700);d.lines(80,253,['Verified subject + workspace'],17)
 d.line([(382,234),(471,234)],dash=True)

@@ -6,11 +6,11 @@ Three views explain different contracts of the platform. The component names ref
 
 ![Platform data paths](context-graph-overview.svg)
 
-Read the top row left to right: schema-validated input becomes Kafka events, Flink jobs produce domain projections, Iceberg retains them, and SQL-backed APIs serve authorized views. The live lane reaches clients through Kafka subscriptions without waiting for a lakehouse query. The media lane retains bytes in object storage and sends only metadata through the event pipeline.
+Read the top row left to right: schema-validated input becomes Kafka events, Flink jobs produce schema-defined datasets and SQL views, Iceberg retains them, and SQL-backed APIs serve authorized views. The live lane reaches clients through Kafka subscriptions without waiting for a lakehouse query. The media lane retains bytes in object storage and sends only metadata through the event pipeline.
 
 Polaris manages catalog metadata and vends storage credentials to service identities. It does not replace SpiceDB or grant end users direct warehouse access. Native Kubernetes deployments run the Flink jobs; incremental RocksDB checkpoints and savepoints use a separate private recovery bucket.
 
-Temporal source adapters, synthetic data generators, and application producers all enter through ingestion contracts. The read-only control plane observes Kubernetes, Flink REST, configured APIs/queries, and metrics. PostgreSQL supports service metadata; the domain graph itself lives in Iceberg tables.
+Temporal source adapters, synthetic data generators, and application producers all enter through ingestion contracts. The read-only control plane observes Kubernetes, Flink REST, configured APIs/queries, and metrics. PostgreSQL supports service metadata; application data lives in schema-defined Iceberg tables.
 
 ## Execution and extension
 

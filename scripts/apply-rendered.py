@@ -5,7 +5,7 @@ p=argparse.ArgumentParser();p.add_argument('--context',required=True);p.add_argu
 docs=[d for d in yaml.safe_load_all(open(a.manifest)) if d]
 jobs=[d for d in docs if d['kind']=='Job']
 for job in jobs:
- if job['metadata']['name'] not in ('secure-topics-v1','spicedb-migrate-v1562','polaris-bootstrap-v170'):raise SystemExit('Refusing automatic recreation of unrecognized Job')
+ if job['metadata']['name'] not in ('secure-topics-schema-v1','spicedb-migrate-v1562','polaris-bootstrap-v170'):raise SystemExit('Refusing automatic recreation of unrecognized Job')
 # Secrets and policies have already been prepared by deploy.sh.
 subprocess.run(base+['apply','-f','-'],input=yaml.safe_dump_all([d for d in docs if d['kind']!='Job']),text=True,check=True)
 for job in jobs:

@@ -19,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class QueryService {
+  static { io.vertx.core.json.jackson.DatabindCodec.mapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS); }
   private final Vertx vertx=Vertx.vertx();
   private HttpServer server;
   private final Set<ServerWebSocket> sockets=ConcurrentHashMap.newKeySet();
@@ -72,20 +73,15 @@ public final class QueryService {
       IcebergQueries.validateSources(sources.keySet());SafeSql.validate(q.path("sql").asText(),sources.keySet());
       sdl.append(q.path("signature").asText()).append('\n');
       query.dataFetcher(entry.getKey(),env->CompletableFuture.supplyAsync(()->{try{
-        if(q.has("sources"))return db.federate(sources,q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
-        var source=sources.get("source");
-        var rows=db.execute(source.table(),source.policy(),q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        List<Map<String,Object>> rows;
+        if(q.has("sources"))rows=db.federate(sources,q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        else {var source=sources.get("source");
+        rows=db.execute(source.table(),source.policy(),q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);}
         if(q.path("engine").asText().equals("bm25")||q.path("engine").asText().equals("documents"))return DocumentSearch.execute(rows,env.getArguments(),q.path("engine").asText().equals("documents"),env.getGraphQlContext().get("security"),permissions,q.path("ranking"));
         return rows;
       }catch(Exception e){throw new CompletionException(e);}},workers));
     });
-    // Every discovered table gets a typed field; nested Iceberg types use the JSON scalar.
-    StringBuilder types=new StringBuilder();
-    tables.values().forEach(table->{String suffix=table.name().replaceAll("[^A-Za-z0-9_]","_");String type="Iceberg_"+suffix,field="table_"+suffix;
-      types.append("type ").append(type).append(" {\n");for(var c:table.columns())types.append(c.name()).append(": ").append(graphType(c.type())).append('\n');types.append("}\n");
-      sdl.append(field).append("(limit: Int = 100): [").append(type).append("!]!\n");query.dataFetcher(field,env->CompletableFuture.supplyAsync(()->{try{return db.execute(table,policies.get(table.name()),"SELECT * FROM source LIMIT :limit",env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);}catch(Exception e){throw new CompletionException(e);}},workers));
-    });
-    sdl.append("}\n").append(types);if(config.path("subscriptions").size()>0)sdl.append("type Subscription {\n");TypeRuntimeWiring.Builder subscriptions=TypeRuntimeWiring.newTypeWiring("Subscription");
+    sdl.append("}\n");if(config.path("subscriptions").size()>0)sdl.append("type Subscription {\n");TypeRuntimeWiring.Builder subscriptions=TypeRuntimeWiring.newTypeWiring("Subscription");
     config.path("subscriptions").fields().forEachRemaining(entry->{JsonNode q=entry.getValue();sdl.append(q.path("signature").asText()).append('\n');List<String> topics=new ArrayList<>();q.path("topics").forEach(t->topics.add(t.asText()));subscriptions.dataFetcher(entry.getKey(),env->CompletableFuture.supplyAsync(()->{
       if(!live.ready())throw new IllegalStateException("Subscriptions unavailable");
       SecurityContext context=env.getGraphQlContext().get("security");permissions.workspace(context,"access");String entity=env.getArgument("entityId");
@@ -96,12 +92,12 @@ public final class QueryService {
     if(config.path("mutations").size()>0) {
       sdl.append("type Mutation {\n");var mutations=TypeRuntimeWiring.newTypeWiring("Mutation");
       config.path("mutations").fields().forEachRemaining(e->{var definition=e.getValue();sdl.append(definition.path("signature").asText()).append('\n');
-        mutations.dataFetcher(e.getKey(),env->CompletableFuture.supplyAsync(()->{try{return EventMutations.publish(definition.path("path").asText(),env.getArgument("input"),env.getGraphQlContext().get("authorization"),env.getGraphQlContext().get("security"),access);}catch(Exception error){throw new CompletionException(error);}},workers));});
+        mutations.dataFetcher(e.getKey(),env->CompletableFuture.supplyAsync(()->{try{return EventMutations.publish(definition.path("path").asText(),env.getArgument("input"),env.getArgument("resourceKey"),env.getGraphQlContext().get("authorization"),env.getGraphQlContext().get("security"),access);}catch(Exception error){throw new CompletionException(error);}},workers));});
       sdl.append("}\n");wiring.type(mutations);
     }
     wiring.type(query);graph=GraphQL.newGraphQL(new SchemaGenerator().makeExecutableSchema(new SchemaParser().parse(sdl.toString()),wiring.build())).defaultDataFetcherExceptionHandler(parameters->CompletableFuture.completedFuture(graphql.execution.DataFetcherExceptionHandlerResult.newResult().error(GraphqlErrorBuilder.newError(parameters.getDataFetchingEnvironment()).message("Request denied or query unavailable").build()).build())).instrumentation(new graphql.execution.instrumentation.ChainedInstrumentation(List.of(new graphql.analysis.MaxQueryDepthInstrumentation(12),new graphql.analysis.MaxQueryComplexityInstrumentation(1000)))).build();schemaHealthy=true;
   }
-  static String graphType(String type){return switch(type){case "int"->"Int";case "long"->"Long";case "float","double"->"Float";case "boolean"->"Boolean";default->type.startsWith("{")?"JSON":"String";};}
+  static String graphType(String type){return switch(type){case "int"->"Int";case "long"->"Long";case "float","double"->"Float";case "boolean"->"Boolean";case "variant"->"JSON";default->type.startsWith("{")?"JSON":"String";};}
   ExecutionInput input(JsonObject body,SecurityContext context){return ExecutionInput.newExecutionInput().query(body.getString("query", "")).operationName(body.getString("operationName")).variables(body.getJsonObject("variables",new JsonObject()).getMap()).graphQLContext(Map.of("security",context)).build();}
   public void start(){
     HttpServerOptions httpOptions=serverOptions();

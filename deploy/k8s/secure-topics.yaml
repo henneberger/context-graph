@@ -1,6 +1,6 @@
 apiVersion: batch/v1
 kind: Job
-metadata: {name: secure-topics-v1, namespace: context-graph}
+metadata: {name: secure-topics-schema-v1, namespace: context-graph}
 spec:
   backoffLimit: 8
   template:
@@ -16,7 +16,7 @@ spec:
           args:
             - |
               K=/opt/kafka/bin
-              for topic in events images video slack github metrics nodes edges errors; do
+              for topic in events images video slack github metrics rows.events rows.images rows.video rows.slack rows.github errors; do
                 "$K/kafka-topics.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --create --if-not-exists --topic "cg.secure.$topic" --partitions 6 --replication-factor 3 --config min.insync.replicas=2
               done
               acl() { "$K/kafka-acls.sh" --bootstrap-server secure-kafka:9092 --command-config /app/secrets/kafka.properties --add "$@"; }
@@ -24,7 +24,7 @@ spec:
                 acl --allow-principal User:ingestion --operation Write --operation Describe --topic "cg.secure.$topic"
                 acl --allow-principal User:processor --operation Read --operation Describe --topic "cg.secure.$topic"
               done
-              for topic in metrics nodes edges; do
+              for topic in metrics rows.events rows.images rows.video rows.slack rows.github; do
                 acl --allow-principal User:processor --operation Write --operation Describe --topic "cg.secure.$topic"
                 acl --allow-principal User:query --operation Read --operation Describe --topic "cg.secure.$topic"
               done
@@ -32,7 +32,7 @@ spec:
               acl --allow-principal User:ingestion --allow-principal User:processor --operation Write --operation Describe --topic cg.secure.errors
               acl --allow-principal User:ingestion --operation IdempotentWrite --cluster
               acl --allow-principal User:processor --operation IdempotentWrite --cluster
-              acl --allow-principal User:processor --operation Read --group context-secure- --resource-pattern-type prefixed
+              acl --allow-principal User:processor --operation Read --group context-schema- --resource-pattern-type prefixed
               acl --allow-principal User:processor --operation Write --operation Describe --transactional-id context-secure- --resource-pattern-type prefixed
               acl --allow-principal User:query --operation Read --group context-query- --resource-pattern-type prefixed
           resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {memory: 384Mi}}

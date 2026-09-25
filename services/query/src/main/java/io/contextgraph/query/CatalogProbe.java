@@ -14,7 +14,5 @@ public final class CatalogProbe {
    var result=db.execute(table,new IcebergQueries.Policy("entity_id",null),"SELECT count(*) AS n FROM source",Map.of(),context,checks,limits);
    System.out.println(user+" "+result);
   }
-  var sources=Map.of("nodes",new IcebergQueries.Source(tables.get("context_secure.nodes"),new IcebergQueries.Policy("node_id",null)),"metrics",new IcebergQueries.Source(tables.get("context_secure.metrics"),new IcebergQueries.Policy("entity_id",null)));
-  System.out.println("federation "+db.federate(sources,"SELECT count(*) AS n FROM nodes n JOIN metrics m ON n.node_id=m.entity_id",Map.of(),new SecurityContext("alice","demo",Instant.now().getEpochSecond()+300),checks,limits));
  }
 }

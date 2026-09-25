@@ -9,7 +9,7 @@ import java.util.regex.*;
 
 /** Only committed Hadoop-catalog versions are exposed; no lexicographic metadata guessing. */
 public final class IcebergQueries {
-  static final ObjectMapper JSON = new ObjectMapper();
+  static final ObjectMapper JSON = new ObjectMapper().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
   public record Column(String name, String type, boolean nullable) {}
   public record Table(String name, String metadata, List<Column> columns) {}
   public record BoundSql(String sql, List<Object> values) {}
@@ -111,6 +111,7 @@ public final class IcebergQueries {
     if(names.isEmpty()||names.size()>8)throw new IllegalArgumentException("One to eight sources required");
     for(String name:names)if(!name.matches("[a-z][a-z0-9_]{0,47}")||Set.of("main","temp","system","lake").contains(name))throw new IllegalArgumentException("Invalid source alias");
   }
+  private static final class JsonType {static JsonNode parse(String value){try{return JSON.readTree(value);}catch(Exception e){throw new IllegalArgumentException(e);}}}
   static List<Map<String,Object>> joinAuthorized(Map<String,Source> sources,Map<String,List<Map<String,Object>>> inputs,
       String sql,Map<String,Object> args,SecurityContext context,PermissionChecks permissions,Limits limits,long deadline)throws Exception {
     validateSources(sources.keySet());SafeSql.validate(sql,sources.keySet());permissions.workspace(context,"access");
@@ -123,19 +124,20 @@ public final class IcebergQueries {
         if(!registered(source.table(),source.policy()))throw new SecurityException("Unregistered source");
         var definitions=new ArrayList<String>();
         for(var col:columns) {
-          if(!col.name().matches("[a-z_][a-z0-9_]*"))throw new SecurityException("Invalid column");
-          definitions.add("\""+col.name()+"\" "+switch(col.type()){case "int","long"->"BIGINT";case "float","double"->"DOUBLE";case "boolean"->"BOOLEAN";case "timestamptz","timestamp"->"TIMESTAMPTZ";default->"VARCHAR";});
+          if(col.name().indexOf('\0')>=0)throw new SecurityException("Invalid column");
+          var type=col.type().startsWith("{")?JSON.readTree(col.type()):JSON.getNodeFactory().textNode(col.type());
+          definitions.add("\""+col.name().replace("\"","\"\"")+"\" "+ApiCompiler.sqlType(type));
         }
         statement.execute("CREATE TEMP TABLE "+alias+" ("+String.join(",",definitions)+")");
         var rows=inputs.get(alias);total+=rows.size();if(total>limits.maxRows())throw new IllegalStateException("Federated row limit exceeded");
-        try(var insert=c.prepareStatement("INSERT INTO "+alias+" VALUES ("+String.join(",",Collections.nCopies(columns.size(),"?"))+")")) {
+        try(var insert=c.prepareStatement("INSERT INTO "+alias+" VALUES ("+String.join(",",columns.stream().map(col->(col.type().startsWith("{")||col.type().equals("variant"))?"CAST(?::JSON AS "+ApiCompiler.sqlType(col.type().startsWith("{")?JsonType.parse(col.type()):JSON.getNodeFactory().textNode(col.type()))+")":"?").toList())+")")) {
           for(var row:rows) {
             checkDeadline(deadline);
             if(!context.workspaceId().equals(row.get("workspace_id")))throw new SecurityException("Workspace mismatch");
             validateLabel(context,row.get("resource_id"),row.get(source.policy().entityColumn()));contributors.add((String)row.get("resource_id"));
             if(source.policy().targetEntityColumn()!=null){validateLabel(context,row.get("target_resource_id"),row.get(source.policy().targetEntityColumn()));contributors.add((String)row.get("target_resource_id"));}
             if(contributors.size()>limits.maxResources())throw new IllegalStateException("Federated resource limit exceeded");
-            for(int i=0;i<columns.size();i++){Object value=row.get(columns.get(i).name());insert.setObject(i+1,value instanceof Map||value instanceof List?JSON.writeValueAsString(value):value);}insert.addBatch();
+            for(int i=0;i<columns.size();i++){Object value=row.get(columns.get(i).name());insert.setObject(i+1,(columns.get(i).type().startsWith("{")||columns.get(i).type().equals("variant"))?JSON.writeValueAsString(value):value);}insert.addBatch();
           }insert.executeBatch();
         }
       }
@@ -192,7 +194,11 @@ public final class IcebergQueries {
     if(value instanceof java.time.ZonedDateTime t) return t.toInstant().toString();
     if(value instanceof java.time.LocalDateTime t) return t.toInstant(java.time.ZoneOffset.UTC).toString();
     if(value instanceof java.time.temporal.TemporalAccessor) return value.toString();
-    if(value instanceof java.sql.Array array) {try{return array.getArray();}catch(SQLException e){throw new IllegalArgumentException(e);}}
+    if(value instanceof org.duckdb.DuckDBStruct struct) {try{return normalizeValue(struct.getMap());}catch(SQLException e){throw new IllegalArgumentException(e);}}
+    if(value instanceof java.sql.Array array) {try{return normalizeValue(array.getArray());}catch(SQLException e){throw new IllegalArgumentException(e);}}
+    if(value instanceof Map<?,?> map){var out=new LinkedHashMap<String,Object>();map.forEach((k,v)->out.put(k.toString(),normalizeValue(v)));return out;}
+    if(value instanceof Object[] array)return Arrays.stream(array).map(IcebergQueries::normalizeValue).toList();
+
     return value;
   }
   static List<Map<String,Object>> run(Connection c,BoundSql bound) throws Exception {

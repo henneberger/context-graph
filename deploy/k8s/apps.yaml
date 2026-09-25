@@ -26,7 +26,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: ingestion
-        image: context-graph/ingestion:observability-v1
+        image: context-graph/ingestion:schema-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -196,7 +196,7 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
       - name: query
-        image: context-graph/query:harness-v3
+        image: context-graph/query:schema-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
@@ -374,7 +374,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: dashboard
-        image: context-graph/dashboard:search-v1
+        image: context-graph/dashboard:schema-v1
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080

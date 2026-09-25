@@ -1,13 +1,16 @@
 registeredTables:
   context_secure.events:
     entityColumn: entity_id
+  context_secure.images:
+    entityColumn: entity_id
+  context_secure.video:
+    entityColumn: entity_id
+  context_secure.slack:
+    entityColumn: entity_id
+  context_secure.github:
+    entityColumn: entity_id
   context_secure.metrics:
     entityColumn: entity_id
-  context_secure.nodes:
-    entityColumn: node_id
-  context_secure.edges:
-    entityColumn: source_id
-    targetEntityColumn: target_id
 types: 'scalar JSON
 
   scalar Long
@@ -16,16 +19,7 @@ types: 'scalar JSON
   String! sample_count: Long! sum_value: Float avg_value: Float min_value: Float max_value:
   Float }
 
-  type EntityMetric { entity_id: String! node_type: String metric: String! sample_count:
-  Long! sum_value: Float! }
-
   type MetricTotal { metric: String! sample_count: Long! sum_value: Float! }
-
-  type Node { node_id: String! node_type: String event_time: String source_event_id:
-  String properties: JSON }
-
-  type Edge { edge_id: String! source_id: String! target_id: String! relation: String
-  event_time: String source_event_id: String properties: JSON }
 
   type Event { event_id: String! entity_id: String! endpoint: String kind: String
   event_time: String ingested_at: String payload: JSON }
@@ -36,27 +30,17 @@ types: 'scalar JSON
   type VideoEvent { eventId: String! entityId: String! eventTime: String! payload:
   VideoPayload! }
 
-  type GraphEvent { topic: String! entityId: String payload: JSON! }
-
-
   type SearchHit { bm25Score: Float recencyBoost: Float titleBoost: Float typeWeight:
   Float id: String! source: String! documentType: String! title: String! snippet:
   String! content: String! url: String! author: String! container: String! updatedAt:
   String! score: Float! revision: String! }
 
+
+  type Record { event_id: String! entity_id: String! event_time: String metric: String
+  value: JSON _json_remainder: JSON }
+
   '
 queries:
-  entityMetrics:
-    signature: 'entityMetrics(metric: String!, limit: Int = 100): [EntityMetric!]!'
-    sources:
-      graph_nodes: context_secure.nodes
-      metric_windows: context_secure.metrics
-    sql: "WITH latest_nodes AS (\n  SELECT node_id, node_type, row_number() OVER (PARTITION\
-      \ BY node_id ORDER BY event_time DESC) rn\n  FROM graph_nodes\n)\nSELECT m.entity_id,\
-      \ n.node_type, m.metric, sum(m.sample_count) AS sample_count, sum(m.sum_value)\
-      \ AS sum_value\nFROM metric_windows m JOIN latest_nodes n ON m.entity_id=n.node_id\
-      \ AND n.rn=1\nWHERE m.metric=:metric GROUP BY m.entity_id,n.node_type,m.metric\
-      \ ORDER BY m.entity_id LIMIT :limit\n"
   metricTotals:
     signature: 'metricTotals(metric: String!): [MetricTotal!]!'
     table: context_secure.metrics
@@ -67,27 +51,11 @@ queries:
     table: context_secure.metrics
     sql: SELECT * FROM source WHERE (:entityId IS NULL OR entity_id = :entityId) ORDER
       BY window_end DESC LIMIT :limit
-  nodes:
-    signature: 'nodes(limit: Int = 100): [Node!]!'
-    table: context_secure.nodes
-    sql: SELECT * EXCLUDE (rn) FROM (SELECT *, row_number() OVER (PARTITION BY node_id
-      ORDER BY event_time DESC) rn FROM source) WHERE rn=1 LIMIT :limit
-  edges:
-    signature: 'edges(limit: Int = 100): [Edge!]!'
-    table: context_secure.edges
-    sql: SELECT * EXCLUDE (rn) FROM (SELECT *, row_number() OVER (PARTITION BY edge_id
-      ORDER BY event_time DESC) rn FROM source) WHERE rn=1 LIMIT :limit
-  media:
-    signature: 'media(entityId: String, limit: Int = 100): [Event!]!'
-    table: context_secure.events
-    sql: SELECT * FROM source WHERE kind IN ('image','video') AND (:entityId IS NULL
-      OR entity_id=:entityId) ORDER BY event_time DESC LIMIT :limit
   search:
     signature: 'search(query: String!, source: String = "all", limit: Int = 10, sinceDays:
       Int = 0, sort: String = "relevance"): [SearchHit!]!'
     engine: bm25
-    table: context_secure.events
-    sql: SELECT * FROM source WHERE endpoint IN ('slack','github')
+    sql: SELECT * FROM slack UNION ALL SELECT * FROM github
     ranking:
       recencyWeight: 0.35
       titleBoost: 0.2
@@ -103,11 +71,31 @@ queries:
         pull_request: 1.15
         issue: 1.1
         commit: 0.8
+    sources:
+      slack: context_secure.slack
+      github: context_secure.github
   documents:
     signature: 'documents(ids: [String!]!): [SearchHit!]!'
     engine: documents
+    sql: SELECT * FROM slack UNION ALL SELECT * FROM github
+    sources:
+      slack: context_secure.slack
+      github: context_secure.github
+  media:
+    signature: 'media(entityId: String, limit: Int = 100): [Event!]!'
+    sources:
+      video: context_secure.video
+    sql: "SELECT event_id, entity_id, event_time, 'video' AS kind,\n STRUCT_PACK(streamId\
+      \ := streamId, sequence := sequence, uri := uri, playlistUri := playlistUri,\n\
+      \ durationSeconds := durationSeconds, keyframeAligned := keyframeAligned) AS\
+      \ payload\n FROM video WHERE (:entityId IS NULL OR entity_id=:entityId)\n ORDER\
+      \ BY event_time DESC LIMIT :limit"
+  records:
+    signature: 'records(entityId: String, limit: Int = 100): [Record!]!'
     table: context_secure.events
-    sql: SELECT * FROM source WHERE endpoint IN ('slack','github')
+    sql: SELECT event_id, entity_id, event_time, metric, value, _json_remainder FROM
+      source WHERE (:entityId IS NULL OR entity_id=:entityId) ORDER BY event_time
+      DESC LIMIT :limit
 subscriptions:
   metricUpdated:
     signature: 'metricUpdated(entityId: String): Metric!'
@@ -119,10 +107,3 @@ subscriptions:
     topics:
     - cg.secure.video
     entityField: entityId
-  graphUpdated:
-    signature: 'graphUpdated(entityId: String): GraphEvent!'
-    topics:
-    - cg.secure.nodes
-    - cg.secure.edges
-    entityField: node_id
-    wrap: true

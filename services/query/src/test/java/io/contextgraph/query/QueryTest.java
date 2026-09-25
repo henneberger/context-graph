@@ -34,9 +34,9 @@ class QueryTest {
   assertTrue(LiveBus.matches(metric,List.of("cg.metrics"),"entity_id","sensor-a"));
   assertFalse(LiveBus.matches(metric,List.of("cg.video"),"entity_id","sensor-a"));
   assertFalse(LiveBus.matches(metric,List.of("cg.metrics"),"entity_id","sensor-b"));
-  var edge=new LiveBus.Event("cg.edges",Map.of("source_id","a","target_id","b"));
-  assertTrue(LiveBus.matches(edge,List.of("cg.edges"),"node_id","b"));
-  assertTrue(LiveBus.matches(new LiveBus.Event("cg.edges.v2", edge.payload()),List.of("cg.edges.v2"),"node_id","b"));
+  var unrelated=new LiveBus.Event("cg.records",Map.of("source_id","a","target_id","b","resource","c"));
+  assertFalse(LiveBus.matches(unrelated,List.of("cg.records"),"resource","b"));
+  assertTrue(LiveBus.matches(unrelated,List.of("cg.records"),"resource","c"));
  }
  @Test void usesHintAndIgnoresUncommittedHigherVersion() throws Exception {
   Path md=Files.createDirectories(dir.resolve("context/metrics/metadata"));Files.writeString(md.resolve("version-hint.text"),"1");

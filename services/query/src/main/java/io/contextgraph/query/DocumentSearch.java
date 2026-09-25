@@ -18,17 +18,17 @@ final class DocumentSearch {
     for(var row:rows) {
       IcebergQueries.validateLabel(context,row.get("resource_id"),row.get("entity_id"));
       if(!context.workspaceId().equals(row.get("workspace_id")))throw new SecurityException("Workspace mismatch");
-      if(!(row.get("payload") instanceof Map<?,?> raw))continue;
+      Map<?,?> raw=row;
       @SuppressWarnings("unchecked") var p=(Map<String,Object>)raw;
       String id=text(p,"documentId"),source=text(p,"source");
-      if(id.isBlank()||!Set.of("github","slack").contains(source)||!source.equals(row.get("endpoint")))continue;
+      if(id.isBlank()||!Set.of("github","slack").contains(source)||!source.equals(row.getOrDefault("endpoint",source)))continue;
       String key=source+"\0"+id;
       var old=latest.get(key);
       if(old==null||version(row).compareTo(version(old))>0)latest.put(key,row);
     }
     List<Document> documents=new ArrayList<>();int bytes=0;
     for(var row:latest.values()) {
-      @SuppressWarnings("unchecked") var p=(Map<String,Object>)row.get("payload");
+      @SuppressWarnings("unchecked") var p=row;
       if(Boolean.TRUE.equals(p.get("deleted")))continue;
       String source=text(p,"source"),url=text(p,"url");URI uri;
       try{uri=URI.create(url);}catch(Exception e){throw new SecurityException("Invalid citation");}
@@ -41,7 +41,7 @@ final class DocumentSearch {
     permissions.workspace(context,"access");for(String resource:documents.stream().map(Document::resource).collect(java.util.stream.Collectors.toSet()))permissions.require(context,resource);
     return documents;
   }
-  private static String version(Map<String,Object> row){@SuppressWarnings("unchecked") var p=(Map<String,Object>)row.get("payload");return text(p,"observedAt")+"|"+Objects.toString(row.get("ingested_at"),"")+"|"+row.get("event_id");}
+  private static String version(Map<String,Object> row){@SuppressWarnings("unchecked") var p=row;return text(p,"observedAt")+"|"+Objects.toString(row.get("ingested_at"),"")+"|"+row.get("event_id");}
   private static String text(Map<String,Object> p,String key){return Objects.toString(p.get(key),"");}
   static List<Map<String,Object>> execute(List<Map<String,Object>> rows,Map<String,Object> args,boolean byIds,SecurityContext context,PermissionChecks permissions) throws Exception {
     return execute(rows,args,byIds,context,permissions,IcebergQueries.JSON.createObjectNode());

@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1440" height="1120" viewBox="0 0 1440 1120" role="img" aria-labelledby="title desc">
-<title id="title">Access follows the caller, all the way to results</title><desc id="desc">The domain graph lives in Iceberg. SpiceDB holds the separate graph that determines who may see it.</desc>
+<title id="title">Access follows the caller, all the way to results</title><desc id="desc">JSON Schema defines application data. SpiceDB determines who can access each resource.</desc>
 <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0L8 4L0 8" fill="none" stroke="#728995" stroke-width="1.5"/></marker></defs>
 <rect width="1440" height="1120" fill="#fff"/>
 <g font-family="Arial, Helvetica, sans-serif">
 <text x="56" y="44" font-size="13" font-weight="700" fill="#087e83">CONTEXT GRAPH  /  PLATFORM FIELD GUIDE</text>
 <text x="56" y="98" font-size="36" font-weight="700" fill="#122d3a">Access follows the caller, all the way to results</text>
-<text x="56" y="134" font-size="18" font-weight="400" fill="#526773">The domain graph lives in Iceberg. SpiceDB holds the separate graph that determines who may see it.</text>
+<text x="56" y="134" font-size="18" font-weight="400" fill="#526773">JSON Schema defines application data. SpiceDB determines who can access each resource.</text>
 <rect x="56" y="180" width="1328" height="110" rx="12" fill="#f6f2fa"/>
 <text x="80" y="220" font-size="25" font-weight="700" fill="#122d3a">OIDC identity</text>
 <text x="80" y="253" font-size="17" font-weight="400" fill="#526773">Verified subject + workspace</text>

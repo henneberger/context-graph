@@ -30,11 +30,11 @@ public final class LiveBus implements AutoCloseable {
   public static boolean matches(Event event,Collection<String> topics,String field,String entity) {
     if(!topics.contains(event.topic()))return false;
     if(entity==null)return true;
-    return entity.equals(event.payload().get(field)) || (entity.equals(event.payload().get("source_id"))||entity.equals(event.payload().get("target_id")));
+    return entity.equals(event.payload().get(field));
   }
   public Flux<Map<String,Object>> stream(Collection<String> topics,String field,String entity,boolean wrap,SecurityContext context,PermissionChecks permissions,reactor.core.scheduler.Scheduler scheduler) {
     return events.asFlux().filter(e->matches(e,topics,field,entity)).onBackpressureBuffer(buffer).publishOn(scheduler,1).filter(e->EventAuthorization.visible(e,context,permissions,entity))
-      .map(e->{if(!wrap)return e.payload();Map<String,Object> out=new LinkedHashMap<>();out.put("topic",e.topic());out.put("entityId",e.payload().getOrDefault(field,e.payload().get("source_id")));out.put("payload",e.payload());return out;});
+      .map(e->{if(!wrap)return e.payload();Map<String,Object> out=new LinkedHashMap<>();out.put("topic",e.topic());out.put("entityId",e.payload().get(field));out.put("payload",e.payload());return out;});
   }
   public void close(){running=false;if(consumer==null){ready=false;events.tryEmitComplete();return;}consumer.wakeup();try{thread.join(10000);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
 }

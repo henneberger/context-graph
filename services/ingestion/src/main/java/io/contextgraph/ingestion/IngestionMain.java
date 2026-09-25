@@ -30,7 +30,7 @@ public final class IngestionMain {
     private final AtomicBoolean kafkaReady = new AtomicBoolean();
     private final AtomicBoolean checkingKafka = new AtomicBoolean();
     private HttpServer server;
-    record Endpoint(String name, String kind, String topic, SchemaCheck schema) {}
+    record Endpoint(String name, String kind, String topic, SchemaCheck schema, String resourcePointer, String eventTimePointer) {}
     record Authorized(SecurityContext context,String entityId,String resourceId) {}
     private Authorized authorize(SecurityContext context,String entity) {
         String resource=AccessControl.resourceId(context.workspaceId(),entity); access.require(context,resource,"ingest");
@@ -50,7 +50,7 @@ public final class IngestionMain {
         for (Object item : config.getJsonArray("endpoints")) {
             JsonObject e = (JsonObject)item;
             if (!Set.of("json", "image", "video").contains(e.getString("kind"))) throw new IllegalArgumentException("Unsupported endpoint kind");
-            Endpoint endpoint = new Endpoint(e.getString("name"), e.getString("kind"), e.getString("topic"), e.containsKey("schema") ? new SchemaCheck(configDir.resolve(e.getString("schema"))) : null);
+            Endpoint endpoint = new Endpoint(e.getString("name"), e.getString("kind"), e.getString("topic"), e.containsKey("schema") ? new SchemaCheck(configDir.resolve(e.getString("schema"))) : null,e.getString("resourcePointer",""),e.getString("eventTimePointer",""));
             if (endpoint.kind.equals("json") && endpoint.schema == null) throw new IllegalArgumentException("JSON endpoints require a schema");
             if (!topics.add(endpoint.topic)) throw new IllegalArgumentException("Each endpoint requires a distinct Kafka topic");
             if (endpoints.put(e.getString("path"), endpoint) != null) throw new IllegalArgumentException("Duplicate endpoint path");
@@ -145,8 +145,15 @@ public final class IngestionMain {
         try { done.get(config.getInteger("maxVideoSeconds",3600), TimeUnit.SECONDS); out.flush(); }
         finally { vertx.cancelTimer(timer); }
     }
-    private JsonObject event(Endpoint endpoint, Authorized auth, JsonObject payload) {
-        String now = Instant.now().toString(); String eventTime = payload.getString("eventTime",now);
+    private static String pointer(Object payload,String pointer,String fallback) throws Exception {
+        if(!pointer.startsWith("/"))throw new IllegalArgumentException("JSON Pointer must begin with /");
+        var value=new com.fasterxml.jackson.databind.ObjectMapper().readTree(io.vertx.core.json.Json.encode(payload)).at(pointer);
+        if(value.isMissingNode())return fallback;
+        if(!value.isTextual())throw new IllegalArgumentException("Bound resource/time field must be a string");
+        return value.textValue();
+    }
+    private JsonObject event(Endpoint endpoint, Authorized auth, Object payload) throws Exception {
+        String now = Instant.now().toString(); String eventTime = endpoint.eventTimePointer.isBlank()?now:pointer(payload,endpoint.eventTimePointer,now);
         Instant.parse(eventTime);
         return new JsonObject().put("eventId", UUID.randomUUID().toString()).put("schemaVersion",2).put("endpoint",endpoint.name).put("kind",endpoint.kind)
                 .put("entityId",auth.entityId).put("eventTime",eventTime).put("ingestedAt",now).put("payload",payload).put("security",MediaProvenance.labels(auth.context,auth.entityId));
@@ -155,10 +162,14 @@ public final class IngestionMain {
         envelope.validate(event); access.require(auth.context,auth.resourceId,"ingest");
         producer.send(new ProducerRecord<>(endpoint.topic,auth.context.workspaceId()+"\u0000"+auth.resourceId,event.encode())).get(35,TimeUnit.SECONDS);
     }
+    static Object parsePayload(String json) throws Exception {
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper().enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+        return mapper.readValue(json,Object.class);
+    }
     private void json(HttpServerRequest request, Endpoint endpoint,SecurityContext context,AtomicReference<Authorized> authorized) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream(); receive(request,out,config.getLong("maxJsonBytes",900000L),context,null);
-        JsonObject payload = new JsonObject(out.toString(java.nio.charset.StandardCharsets.UTF_8));
-        Authorized auth=authorize(context,payload.getString("entityId")); authorized.set(auth); endpoint.schema.validate(payload);
+        Object payload = parsePayload(out.toString(java.nio.charset.StandardCharsets.UTF_8));
+        Authorized auth=authorize(context,endpoint.resourcePointer.isBlank()?request.getHeader("X-Resource-Key"):pointer(payload,endpoint.resourcePointer,null)); authorized.set(auth); endpoint.schema.validate(payload);
         JsonObject event = event(endpoint,auth,payload);
         publish(endpoint,event,auth); respond(request,202,new JsonObject().put("eventId",event.getString("eventId")));
     }

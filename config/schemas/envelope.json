@@ -43,9 +43,7 @@
       "type": "string",
       "format": "date-time"
     },
-    "payload": {
-      "type": "object"
-    },
+    "payload": {},
     "security": {
       "type": "object",
       "required": [

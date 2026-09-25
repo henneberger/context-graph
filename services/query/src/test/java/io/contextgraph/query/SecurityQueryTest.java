@@ -57,12 +57,11 @@ class SecurityQueryTest {
     var table=new IcebergQueries.Table("legacy.events","/private/path",List.of(new IcebergQueries.Column("entity_id","string",false)));
     assertFalse(IcebergQueries.registered(table,policy));assertFalse(IcebergQueries.registered(table,null));
   }
-  @Test void perEmissionChecksHandleRevocationExpiryOutageAndBothEdgeEnds(){
+  @Test void perEmissionChecksHandleRevocationExpiryAndOutage(){
     var grants=new Grants();var event=new LiveBus.Event("cg.secure.metrics",Map.of("workspace_id","workspace-a","resource_id",a,"entity_id","a"));
     assertTrue(EventAuthorization.visible(event,alice,grants,null));grants.allowed.clear();assertFalse(EventAuthorization.visible(event,alice,grants,null));assertThrows(AuthException.class,()->EventAuthorization.visible(event,alice,grants,"a"));
     grants.allowed.add(a);var expired=new SecurityContext("alice","workspace-a",Instant.now().getEpochSecond()-1);assertThrows(AuthException.class,()->EventAuthorization.visible(event,expired,grants,null));
     grants.outage=true;assertThrows(AuthException.class,()->EventAuthorization.visible(event,alice,grants,null));grants.outage=false;
-    var edge=new LiveBus.Event("cg.secure.edges",Map.of("workspace_id","workspace-a","resource_id",a,"source_id","a","target_id","b","target_resource_id",b));assertFalse(EventAuthorization.visible(edge,alice,grants,null));grants.allowed.add(b);assertTrue(EventAuthorization.visible(edge,alice,grants,null));
   }
   @Test void federatedJoinRechecksEverySourceAndRejectsBypasses()throws Exception {
     var columns=List.of(new IcebergQueries.Column("workspace_id","string",false),new IcebergQueries.Column("resource_id","string",false),new IcebergQueries.Column("entity_id","string",false),new IcebergQueries.Column("value","long",false));

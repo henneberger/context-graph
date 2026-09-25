@@ -1,44 +1,53 @@
-name: context-secure-v1
-parallelism: 2
-sourceTopics:
-- cg.secure.events
-- cg.secure.images
-- cg.secure.video
-- cg.secure.slack
-- cg.secure.github
-consumerGroup: context-secure-v1
-envelopeSchema: schemas/envelope.json
-errorTopic: cg.secure.errors
-checkpointIntervalMs: 10000
-checkpointMinPauseMs: 5000
-watermarkDelaySeconds: 3
-idleSeconds: 10
+name: context-schema-v1
+workspace: demo
 namespace: context_secure
-outputs:
-  events:
-    table: events
-    schema: schemas/events.schema.json
-  nodes:
-    table: nodes
-    topic: cg.secure.nodes
-    schema: schemas/nodes.schema.json
-  edges:
-    table: edges
-    topic: cg.secure.edges
-    schema: schemas/edges.schema.json
-  metrics:
-    table: metrics
-    topic: cg.secure.metrics
-    schema: schemas/metrics.schema.json
-graph:
-  nodeTypePointer: /kind
-  targetPointer: /payload/relatedTo
-  relation: related_to
-aggregations:
-- id: value-10s
-  valuePointer: /payload/value
-  metricPointer: /payload/metric
-  defaultMetric: value
-  windowSeconds: 10
-  scale: 1.0
-  offset: 0.0
+parallelism: 2
+errorTopic: cg.secure.errors
+sources:
+- name: events
+  topic: cg.secure.events
+  schema: schemas/event-input.json
+  table: events
+  changeTopic: cg.secure.rows.events
+- name: images
+  topic: cg.secure.images
+  schema: schemas/image-metadata.json
+  table: images
+  changeTopic: cg.secure.rows.images
+- name: video
+  topic: cg.secure.video
+  schema: schemas/video-metadata.json
+  table: video
+  changeTopic: cg.secure.rows.video
+- name: slack
+  workspace: knowledge
+  topic: cg.secure.slack
+  schema: schemas/document-input.json
+  table: slack
+  changeTopic: cg.secure.rows.slack
+- name: github
+  workspace: knowledge
+  topic: cg.secure.github
+  schema: schemas/document-input.json
+  table: github
+  changeTopic: cg.secure.rows.github
+views:
+- name: metrics
+  table: metrics
+  topic: cg.secure.metrics
+  sql: 'SELECT workspace_id, resource_id, entity_id, metric,
+
+    TUMBLE_START(event_time, INTERVAL ''10'' SECOND) AS window_start,
+
+    TUMBLE_END(event_time, INTERVAL ''10'' SECOND) AS window_end,
+
+    COUNT(*) AS sample_count, SUM(CAST(JSON_VALUE(JSON_STRING(`value`), ''$'') AS DOUBLE)) AS sum_value,
+
+    AVG(CAST(JSON_VALUE(JSON_STRING(`value`), ''$'') AS DOUBLE)) AS avg_value, MIN(CAST(JSON_VALUE(JSON_STRING(`value`), ''$'') AS DOUBLE)) AS min_value,
+
+    MAX(CAST(JSON_VALUE(JSON_STRING(`value`), ''$'') AS DOUBLE)) AS max_value
+
+    FROM events WHERE `value` IS NOT NULL
+
+    GROUP BY workspace_id, resource_id, entity_id, metric, TUMBLE(event_time, INTERVAL
+    ''10'' SECOND)'

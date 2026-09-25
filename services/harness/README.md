@@ -30,17 +30,17 @@ The output directory must be empty. Compiled sources and schemas are reviewable 
 
 ## Bundle contract
 
-See `examples/group-insights/bundle.yaml`. A bundle declares a workspace, JSON input schemas, one or more jobs, SQL views, and API fields. Each input gets its own ingestion route and Kafka topic. Each view gets an Iceberg table and Kafka output topic. GraphQL mutations return a Kafka acceptance receipt; they do not claim immediate Iceberg visibility.
+See `examples/schema-data/bundle.yaml` and `examples/group-insights/bundle.yaml`. A bundle declares a workspace, JSON input schemas, one or more jobs, SQL views, and API fields. Each input gets its own ingestion route and Kafka topic. Each input is persisted as a schema-derived Iceberg table with a Kafka change topic. Each SQL view gets its own table and output topic. GraphQL mutations return a Kafka acceptance receipt; they do not claim immediate Iceberg visibility.
 
 The example has separate activity and trajectory jobs. Activity produces individual events and a ten-second event-time aggregation. Trajectories use an ordinary JSON ingestion endpoint and table. There is no special trajectory database or first-class trajectory model.
 
 ## Security rails
 
 - Builders cannot supply connector URLs, Kafka credentials, catalog credentials, deployment YAML, or arbitrary Java code through a bundle.
-- JSON inputs require `entityId`. Ingestion validates payloads and supplies the authenticated security envelope.
+- Ingestion takes the permission resource key separately through `X-Resource-Key`; GraphQL mutations take `resourceKey`. JSON Schema defines the document without a required domain field.
 - Scope columns `workspace_id`, `resource_id`, and `entity_id` must pass through unchanged. Aggregations must group by all three.
 - SQL cannot join unrelated resources, erase scope through grouping sets, use arbitrary functions, read external files, or execute DDL.
-- Flink validates input envelopes and output scope/types. Invalid input envelopes go to the error topic.
+- Flink validates input envelopes, payload schemas, and output scope/types. Invalid input envelopes go to the error topic.
 - Each release has dedicated Kafka identities with topic ACLs and separate Polaris identities scoped to its catalog namespace. Provider credentials are not included in the bundle.
 - Query and subscription access uses the existing SpiceDB checks. APIs reject identities outside the bundle workspace. Mutation forwarding retains the original user identity.
 - Deployment recompiles the authored source instead of trusting edited generated manifests.
@@ -52,15 +52,15 @@ Applications that combine differently restricted sources need an explicit derive
 The existing local platform, security issuer/CA, Kafka, SpiceDB, object storage, Polaris, and `flink-runtime` service account must exist before deployment. Build runtime images from the repository Dockerfiles with these tags:
 
 ```sh
-docker build -f services/ingestion/Dockerfile -t context-graph/ingestion:harness-v1 .
-docker build -f services/processor/Dockerfile -t context-graph/processor:harness-v2 .
-docker build -f services/query/Dockerfile -t context-graph/query:harness-v3 .
+docker build -f services/ingestion/Dockerfile -t context-graph/ingestion:schema-v1 .
+docker build -f services/processor/Dockerfile -t context-graph/processor:schema-v1 .
+docker build -f services/query/Dockerfile -t context-graph/query:schema-v1 .
 python scripts/cg deploy my-release --context YOUR_CONTEXT --node YOUR_STORAGE_NODE
 python scripts/cg status my-release --context YOUR_CONTEXT
 python scripts/cg promote my-release --context YOUR_CONTEXT
 ```
 
-Flink jobs run as ordinary JobManager and TaskManager Deployments with Kubernetes HA metadata. No Flink operator is needed. Checkpoints use incremental RocksDB state, one concurrent checkpoint, and object-storage recovery paths. The legacy core pipeline migration script takes a savepoint before replacing its operator-managed deployment.
+Flink jobs run as ordinary JobManager and TaskManager Deployments with Kubernetes HA metadata. No Flink operator is needed. Checkpoints use incremental RocksDB state, one concurrent checkpoint, and object-storage recovery paths.
 
 Promotion changes API Service selectors. It does not transfer input events or Flink state between different release namespaces. Each release has its own topics and tables. Repointing to an old release restores its routes, not data written only to a newer release. Production upgrades that require continuous history need an explicit replay/state migration plan; this prototype does not claim automatic zero-downtime state migration.
 
@@ -72,7 +72,7 @@ The [AX execution guide](../../docs/ax.md) connects the builder workflow to the 
 
 ## Current limits
 
-V1 bundle inputs are JSON. The platform's existing media ingestion remains available, but the bundle compiler does not yet generate media endpoints. Flink outputs are append-only and support primitive fields; cast unsupported types explicitly. Jobs consume declared bundle inputs, not arbitrary existing Kafka topics. There is no generated durable command-status store, general rollback/state migration command, background investigation inbox, or autonomous PR author yet.
+V1 bundle inputs are JSON. The platform's existing media ingestion remains available, but the bundle compiler does not yet generate media endpoints. Flink outputs are append-only and support structs, arrays, decimals, and native VARIANT. `_json_remainder` retains unmapped keys at each structured object level. See [schema mapping](../../docs/json-schema-storage.md). Jobs consume declared bundle inputs, not arbitrary existing Kafka topics. There is no generated durable command-status store, general rollback/state migration command, background investigation inbox, or autonomous PR author yet.
 
 
-The checked-in group-insights bundle is a candidate example. Its SQL/schema compilation and policy tests pass, but its complete live ingestion-to-query permission smoke test has not yet passed. The local candidate is left scaled to zero and unpromoted while the AX trial is running. Do not treat that candidate as a production-ready release.
+The checked-in group-insights bundle is a candidate example. Its deployment requires validation against the replacement schema-defined runtime. The local candidate is left scaled to zero and unpromoted while the AX trial is running. Do not treat that candidate as a production-ready release.

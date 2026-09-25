@@ -6,7 +6,7 @@ import yaml, jsonschema, sqlglot
 from sqlglot import exp
 ROOT = Path(__file__).resolve().parents[3]
 SCOPE = {'workspace_id', 'resource_id', 'entity_id'}
-FUNCTIONS = {'JSON_VALUE','JSON_QUERY','TUMBLE','TUMBLE_START','TUMBLE_END','HOP','HOP_START','HOP_END','COUNT','SUM','AVG','MIN','MAX','CAST','TRY_CAST','COALESCE','NULLIF','LOWER','UPPER','LENGTH','CONCAT','SUBSTRING','ROUND','ABS','FLOOR','CEIL','IF','CASE','IFNULL','GREATEST','LEAST'}
+FUNCTIONS = {'JSON_VALUE','JSON_QUERY','JSON_STRING','PARSE_JSON','TRY_PARSE_JSON','TUMBLE','TUMBLE_START','TUMBLE_END','HOP','HOP_START','HOP_END','COUNT','SUM','AVG','MIN','MAX','CAST','TRY_CAST','COALESCE','NULLIF','LOWER','UPPER','LENGTH','CONCAT','SUBSTRING','ROUND','ABS','FLOOR','CEIL','IF','CASE','IFNULL','GREATEST','LEAST'}
 class Invalid(ValueError): pass
 
 def identifier(value, pattern=r'[a-z][a-z0-9_]{0,39}'):
@@ -38,7 +38,7 @@ def sql_policy(sql, sources):
     projections={}
     for item in tree.expressions:
         name=item.alias_or_name
-        identifier(name)
+        identifier(name,r'[A-Za-z_][A-Za-z0-9_]{0,63}')
         if name in projections:raise Invalid('Duplicate output alias')
         projections[name]=item.this if isinstance(item,exp.Alias) else item
     for name in SCOPE:
@@ -79,10 +79,6 @@ def compile_bundle(path, output):
     if not isinstance(bundle['inputs'],dict) or not 1<=len(bundle['inputs'])<=12:raise Invalid('One to twelve inputs required')
     for alias,item in bundle['inputs'].items():
         identifier(alias);keys(item,{'schema'},{'schema'});schema=json.loads(read(item['schema']));jsonschema.Draft202012Validator.check_schema(schema)
-        if schema.get('type')!='object' or '$ref' in json.dumps(schema):raise Invalid('Inputs require self-contained object JSON Schemas')
-        if schema.get('properties',{}).get('entityId',{}).get('type')!='string' or 'entityId' not in schema.get('required',[]):raise Invalid('Inputs require entityId: string')
-        for reserved in ('security','schemaVersion'):
-            schema.setdefault('properties',{})[reserved]=False
         inputs[alias]=schema
     jobs=[];available=set(inputs);view_owners={}
     if not isinstance(bundle['jobs'],dict) or not 1<=len(bundle['jobs'])<=8:raise Invalid('One to eight jobs required')
@@ -96,7 +92,7 @@ def compile_bundle(path, output):
             sql=read(v['sql']);sql_policy(sql,local)
             views.append({'name':view_name,'sql':sql});local.add(view_name);available.add(view_name);view_owners[view_name]=job_name
         parallelism=job.get('parallelism',1)
-        if not isinstance(parallelism,int) or not 1<=parallelism<=8 or not views:raise Invalid('Invalid job parallelism/views')
+        if not isinstance(parallelism,int) or not 1<=parallelism<=8:raise Invalid('Invalid job parallelism')
         jobs.append({'alias':job_name,'sources':job['sources'],'views':views,'parallelism':parallelism})
     api=bundle['api'];keys(api,{'queries','mutations','subscriptions'})
     for q in api.get('queries',{}).values():read(q['sql'])
@@ -113,12 +109,14 @@ def compile_bundle(path, output):
     ing=json.loads((ROOT/'config/ingestion.json').read_text());ing['endpoints']=[];ing['errorTopic']=error_topic
     for alias,schema in inputs.items():
         (out/'schemas'/f'{alias}.json').write_text(json.dumps(schema,indent=2))
-        ing['endpoints'].append({'path':'/ingest/'+alias,'name':alias,'kind':'json','topic':topics[alias],'schema':f'schemas/{alias}.json'})
+        ing['endpoints'].append({'path':'/ingest/'+alias,'name':alias,'kind':'json','topic':topics[alias],'schema':f'schemas/{alias}.json','resourcePointer':'','eventTimePointer':''})
     (out/'ingestion.json').write_text(json.dumps(ing,indent=2))
-    descriptions={};compiled_jobs=[]
+    descriptions={};compiled_jobs=[];owners=set()
     for job in jobs:
+        if owners.intersection(job['sources']):raise Invalid('Each persisted input has one owning job')
+        owners.update(job['sources'])
         config={'name':release+'-'+job['alias'],'workspace':workspace,'namespace':namespace,'parallelism':job['parallelism'],
-          'sources':[{'name':a,'topic':topics[a]} for a in job['sources']], 'views':[], 'errorTopic':error_topic}
+          'sources':[{'name':a,'topic':topics[a],'schema':f'schemas/{a}.json','table':a,'changeTopic':f'cg.secure.{name}.{digest}.out.{a}'} for a in job['sources']], 'views':[], 'errorTopic':error_topic}
         for view in job['views']:
             config['views'].append({**view,'table':view['name'],'topic':f'cg.secure.{name}.{digest}.out.'+view['name']})
         config_path=out/(job['alias']+'.json');config_path.write_text(json.dumps(config,indent=2))
@@ -126,7 +124,7 @@ def compile_bundle(path, output):
         java_tool('processor','io.contextgraph.processor.SqlBundleJob',['--validate',config_path,desc_path])
         descriptions.update(json.loads(desc_path.read_text()));compiled_jobs.append(config)
     # The query compiler prepares SQL against empty typed relations. It never reads user data.
-    query_input={'api':copy.deepcopy(api),'views':descriptions,'namespace':namespace,'inputs':inputs,'topics':{v['name']:v['topic'] for j in compiled_jobs for v in j['views']}}
+    query_input={'api':copy.deepcopy(api),'views':descriptions,'namespace':namespace,'inputs':inputs,'topics':{**{a:f'cg.secure.{name}.{digest}.out.{a}' for a in inputs},**{v['name']:v['topic'] for j in compiled_jobs for v in j['views']}}}
     for q in query_input['api'].get('queries',{}).values():q['sql']=files[q['sql']]
     (out/'api-input.json').write_text(json.dumps(query_input))
     java_tool('query','io.contextgraph.query.ApiCompiler',[out/'api-input.json',out/'queries.yaml'])

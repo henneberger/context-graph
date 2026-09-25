@@ -178,11 +178,11 @@ spec:
 
             taskmanager.memory.process.size: 1280m
 
-            high-availability.cluster-id: context-secure-v1-native
+            high-availability.cluster-id: context-schema-v2
 
             kubernetes.namespace: context-graph
 
-            kubernetes.cluster-id: context-secure-v1-native'
+            kubernetes.cluster-id: context-schema-v2'
         - name: JAVA_TOOL_OPTIONS
           value: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/app/secrets/kafka.truststore.p12
             -Djavax.net.ssl.trustStorePassword=changeit
@@ -196,11 +196,11 @@ spec:
         ports:
         - containerPort: 9249
           name: metrics
-        image: context-graph/processor:harness-v1
+        image: context-graph/processor:schema-v1
         args:
         - standalone-job
         - --job-classname
-        - io.contextgraph.processor.ContextGraphJob
+        - io.contextgraph.processor.SqlBundleJob
         - /app/config/jobs.yaml
         resources:
           requests:
@@ -357,11 +357,11 @@ spec:
 
             taskmanager.memory.process.size: 1280m
 
-            high-availability.cluster-id: context-secure-v1-native
+            high-availability.cluster-id: context-schema-v2
 
             kubernetes.namespace: context-graph
 
-            kubernetes.cluster-id: context-secure-v1-native'
+            kubernetes.cluster-id: context-schema-v2'
         - name: JAVA_TOOL_OPTIONS
           value: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/app/secrets/kafka.truststore.p12
             -Djavax.net.ssl.trustStorePassword=changeit
@@ -375,7 +375,7 @@ spec:
         ports:
         - containerPort: 9249
           name: metrics
-        image: context-graph/processor:harness-v1
+        image: context-graph/processor:schema-v1
         args:
         - taskmanager
         resources:

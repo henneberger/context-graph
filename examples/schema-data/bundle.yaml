@@ -1,0 +1,19 @@
+version: 1
+name: schema-data
+workspace: demo
+inputs:
+  records:
+    schema: schemas/record.json
+jobs:
+  storage:
+    sources: [records]
+    views: {}
+api:
+  queries:
+    records:
+      view: records
+      sql: sql/records.sql
+  mutations:
+    appendRecord: {input: records}
+  subscriptions:
+    recordAdded: {view: records}

@@ -45,6 +45,8 @@ class Smoke:
 
     def request(self, path, body=None, user=None, workspace='demo', token=None, headers=None, origin=None, method=None):
         hdr = dict(headers or {})
+        if path == '/ingest/events' and isinstance(body,dict):
+            hdr.setdefault('X-Resource-Key',body.get('entityId','alpha'))
         if user or token:
             hdr.update({'Authorization': 'Bearer ' + (token or self.token(user)), 'X-Workspace-Id': workspace})
         if isinstance(body, (dict, list)):
@@ -107,7 +109,7 @@ class Smoke:
             payload.update(value=value, metric=metric or self.metric)
         if related:
             payload['relatedTo'] = related
-        response = self.request('/ingest/events', payload, user='producer')
+        response = self.request('/ingest/events', payload, user='producer', headers={'X-Resource-Key':entity})
         if response[0] != 202:
             raise AssertionError(f'Authorized producer ingest failed with HTTP {response[0]}')
         return json.loads(response[1])
@@ -126,8 +128,8 @@ class Smoke:
         self.expect('crossWorkspaceWriteDenied', self.request('/ingest/events', body, user='outsider'), {403})
         self.expect('crossWorkspaceQueryDenied', self.request('/graphql', {'query': '{schemas{name}}'}, user='outsider'), {403})
         self.expect('missingWorkspaceRelationshipDenied', self.request('/ingest/events', {'entityId': 'unprovisioned-' + uuid.uuid4().hex, 'value': 1}, user='producer'), {403})
-        self.expect('forgedSecurityLabelsDenied', self.request('/ingest/events', {**body, 'security': {'workspaceId': 'other', 'subjectId': 'admin'}}, user='producer'), {400})
-        print('PASS verified identity, workspace boundary, explicit write grants and label forgery denial', flush=True)
+        self.expect('invalidSchemaDenied', self.request('/ingest/events', {**body, 'value': 'not-a-number'}, user='producer'), {400})
+        print('PASS verified identity, workspace boundary, explicit write grants and schema rejection', flush=True)
 
     def image_checks(self):
         content = load.image_bytes(argparse.Namespace(file=None, width=160, height=120))
@@ -232,15 +234,15 @@ class Smoke:
     def restrictions(self):
         # shared is workspace-visible with no explicit Alice/Bob reader grants.
         for user in ('alice', 'bob'):
-            rows = self.query(user, '{nodes(limit:1000){node_id}}')['nodes']
-            assert any(row['node_id'] == 'shared' for row in rows)
+            rows = self.query(user, '{records(limit:1000){entity_id}}')['records']
+            assert any(row['entity_id'] == 'shared' for row in rows)
         try:
             self.relationship('shared', 'restricted', '*', 'OPERATION_TOUCH')
             for user in ('alice', 'bob'):
-                rows = self.query(user, '{nodes(limit:1000){node_id}}')['nodes']
-                assert all(row['node_id'] != 'shared' for row in rows)
-            rows = self.query('admin', '{nodes(limit:1000){node_id}}')['nodes']
-            assert any(row['node_id'] == 'shared' for row in rows)
+                rows = self.query(user, '{records(limit:1000){entity_id}}')['records']
+                assert all(row['entity_id'] != 'shared' for row in rows)
+            rows = self.query('admin', '{records(limit:1000){entity_id}}')['records']
+            assert any(row['entity_id'] == 'shared' for row in rows)
         finally:
             self.relationship('shared', 'restricted', '*', 'OPERATION_DELETE')
         self.evidence['workspaceWideDefaultAndRestrictionToggle'] = True
@@ -257,7 +259,7 @@ class Smoke:
         await self.video_checks()
         expiry_token=await asyncio.to_thread(self.short_token,'alice',20)
         expiry_task=asyncio.create_task(ws_checks.run_expiry(self.args.url,expiry_token,'demo',45))
-        historical = '''query($metric:String!){metrics(limit:1000){entity_id metric sample_count sum_value} metricTotals(metric:$metric){metric sample_count sum_value} nodes(limit:1000){node_id} edges(limit:1000){source_id target_id} schemas{name} entityMetrics(metric:$metric,limit:100){entity_id sample_count sum_value}}'''
+        historical = '''query($metric:String!){metrics(limit:1000){entity_id metric sample_count sum_value} metricTotals(metric:$metric){metric sample_count sum_value} records(limit:1000){entity_id} schemas{name}}'''
         expected = {'alice': (65, {'alpha', 'shared'}, 'beta'), 'bob': (605, {'beta', 'shared'}, 'alpha'), 'admin': (665, {'alpha', 'beta', 'shared'}, None)}
         deadline = time.monotonic() + self.args.deadline
         last = 'Waiting for secure checkpoint and query schema refresh'
@@ -269,11 +271,7 @@ class Smoke:
                     rows = [row for row in result['metrics'] if row['metric'] == self.metric]
                     assert {row['entity_id'] for row in rows} == allowed, f'{user}: allowed metric entities not committed'
                     assert result['metricTotals'] and result['metricTotals'][0]['sum_value'] == total, f'{user}: aggregate included missing or forbidden contributors'
-                    assert {row['entity_id'] for row in result['entityMetrics']} == allowed, f'{user}: federated sources leaked or lost an entity'
-                    assert sum(row['sum_value'] for row in result['entityMetrics']) == total, f'{user}: federated aggregate changed contributors'
-                    assert all(row['node_id'] != denied for row in result['nodes']), f'{user}: forbidden graph node'
-                    if denied:
-                        assert all(row['source_id'] != denied and row['target_id'] != denied for row in result['edges']), f'{user}: edge endpoint authorization missing'
+                    assert all(row['entity_id'] != denied for row in result['records']), f'{user}: forbidden resource row'
                     assert all(row['name'].startswith('context_secure.') for row in result['schemas'])
                 break
             except Exception as error:
@@ -281,16 +279,15 @@ class Smoke:
                 await asyncio.sleep(3)
         else:
             raise AssertionError('Secure historical checks deadline exceeded: ' + last)
-        self.evidence['federatedAuthorizationBeforeJoinAndAggregation']=True
         self.evidence['authorizationBeforeSqlAggregation'] = {'alice': 65, 'bob': 605, 'admin': 665}
-        self.evidence['graphBothEndpointsAndRegisteredSchemas'] = True
+        self.evidence['registeredSchemas'] = True
         for user, forbidden in [('alice', 'beta'), ('bob', 'alpha')]:
-            raw = await asyncio.to_thread(self.query, user, '{table_context_secure_events(limit:1000){entity_id workspace_id resource_id}}')
-            rows = raw['table_context_secure_events']
-            assert rows and all(row['entity_id'] != forbidden and row['workspace_id'] == 'demo' for row in rows)
-        self.evidence['generatedFieldsRespectScope'] = True
+            raw = await asyncio.to_thread(self.query, user, '{records(limit:1000){entity_id}}')
+            rows = raw['records']
+            assert rows and all(row['entity_id'] != forbidden for row in rows)
+        self.evidence['configuredFieldsRespectScope'] = True
         await asyncio.to_thread(self.restrictions)
-        print('PASS Iceberg queries, authorized SQL aggregates, graph endpoints, generated fields and workspace visibility policy', flush=True)
+        print('PASS Iceberg queries, authorized SQL aggregates, schema rows, configured fields and workspace visibility policy', flush=True)
 
         async def publish_phase(phase):
             await asyncio.to_thread(self.publish, 'alpha', phase, 'security-ws-' + self.metric)
