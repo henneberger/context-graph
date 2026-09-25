@@ -1,12 +1,46 @@
-# AX execution in Context Graph
+# AX task execution
 
 AX is the execution layer for tasks that work with the context graph. Substrate provides the sandbox runtime; Context Graph provides permissioned data, ingestion, SQL processing, and application APIs. Applications delegate work to AX while continuing to use the platform's identity and access rules.
 
-The workplace assistant demonstrates this pattern. Every question in the normal conversation runs through AX, with progress, streamed answer sections, and clickable sources. AX is part of the implementation, so the user interacts with a single assistant.
+AX has two roles in the platform:
 
-The application harness provides a second entry point: an AX task can run the same bundle-authoring and compilation tools that developers and CI use. These two integrations connect task execution to both using the context graph and building applications on it.
+- **Run application tasks.** Applications submit work that uses the context graph through delegated API access and produces application results or new events.
+- **Build on the platform.** Tasks work in an AX workspace with the application harness, authoring and compiling schemas, SQL jobs, and API definitions into release artifacts.
 
-## Components and responsibilities
+Applications supply the task logic and domain behavior. The shared platform supplies execution, authenticated data access, ingestion, storage, and processing. The repository ships a workplace chat application as one reference implementation. Its retrieval workflow, interface, and model choice belong to that application; other applications define their own task behavior on the same platform.
+
+## Task execution and platform access
+
+```mermaid
+flowchart LR
+  APP["Applications"] --> AX["AX tasks and workspaces"]
+  DEV["Developers / application builders"] --> AX
+  AX --> RUN["Substrate sandbox runtime"]
+  RUN -->|"Delegated identity or capability"| API["Context Graph APIs"]
+  API --> AUTH["SpiceDB permissions"]
+  API --> DATA["Queries / ingestion / subscriptions"]
+  DATA --> GRAPH["Kafka / Flink / Iceberg / Polaris"]
+  RUN --> TOOLS["Application harness / cg"]
+  TOOLS --> BUNDLE["Schemas / SQL / API definitions"]
+  BUNDLE --> DEPLOY["Release workflow"]
+  DEPLOY --> GRAPH
+```
+
+## Building applications with AX
+
+The [builder task manifest](../services/harness/builder/ax.yaml) mounts an AX workspace and runs `cg init` and `cg build`. Its image packages the compiler, Flink and query tooling, and example bundle. Build artifacts contain authored sources, validated schemas, SQL definitions, and generated API definitions that can be inspected before release.
+
+A developer, CI pipeline, or AX task can produce the bundle. The deployment workflow then provisions scoped Kafka and Polaris identities and deploys the application's services and jobs. See the [application harness guide](../services/harness/README.md) for commands and bundle structure.
+
+Tasks that need application data can use [`ContextClient`](../services/harness/context_harness/client.py) with a delegated token file, workspace, and trusted CA. It exposes GraphQL queries, JSON ingestion, and a `trajectory(...)` helper. The example bundle supplies an ordinary `trajectories` ingestion endpoint, allowing applications to feed explicitly scoped run events back through Kafka and Flink into the context graph.
+
+The shipped builder manifest demonstrates compilation. Domain applications can compose these pieces into their own workflows: deriving knowledge from group events, processing meeting media, or coordinating repository work.
+
+## Shipped example: workplace chat
+
+The chat example is included with the repository and demonstrates the platform in use. Every assistant question in that application uses AX. The following components implement that application on the shared task runtime.
+
+### Components and responsibilities
 
 | Component | Responsibility |
 | --- | --- |
@@ -37,7 +71,7 @@ flowchart LR
 
 DeepSeek calls run in the coordinator for this assistant integration. The sandbox executes the retrieval plan through delegated callbacks. Provider credentials stay with the coordinator. The integration connects directly to DeepSeek.
 
-## How a conversation runs
+### How a conversation runs
 
 1. The UI submits the question and previous user questions to `POST /search/api/ask`. The frontend proxy routes it to the investigation coordinator's `/api/ask` endpoint.
 2. The coordinator authenticates the caller against the serving API and acquires execution capacity. Waiting requests receive a progress event.
@@ -50,7 +84,7 @@ Follow-up questions carry the previous user questions into planning and synthesi
 
 The stream uses `status`, `search`, `block`, `reset`, `done`, and `error` events. Progress messages describe execution stages, such as “Searching your knowledge” and “Gathering supporting sources.” The UI renders answer sections as they arrive and opens verified source records from inline citations.
 
-## Permissions and delegated access
+### Permissions and delegated access
 
 The coordinator retains the authenticated user token. The investigator receives a short-lived capability scoped to its run and search plan. Its callbacks return document identifiers, dates, and ranking metadata; source text stays with the coordinator for answer generation.
 
@@ -58,17 +92,7 @@ Retrieval passes through the existing serving API and SpiceDB checks. The coordi
 
 The internal callback routes are `/internal/investigation/search` and `/internal/investigation/complete`. They require the run capability and are accessed over verified TLS. The public frontend exposes the conversation routes. AX and Substrate control endpoints remain private infrastructure services.
 
-## Building applications with AX
-
-The [builder task manifest](../services/harness/builder/ax.yaml) mounts an AX workspace and runs `cg init` and `cg build`. Its image packages the compiler, Flink and query tooling, and example bundle. Build artifacts contain authored sources, validated schemas, SQL definitions, and generated API definitions that can be inspected before release.
-
-A developer, CI pipeline, or AX task can produce the bundle. The deployment workflow then provisions scoped Kafka and Polaris identities and deploys the application's services and jobs. See the [application harness guide](../services/harness/README.md) for commands and bundle structure.
-
-Tasks that need application data can use [`ContextClient`](../services/harness/context_harness/client.py) with a delegated token file, workspace, and trusted CA. It exposes GraphQL queries, JSON ingestion, and a `trajectory(...)` helper. The example bundle supplies an ordinary `trajectories` ingestion endpoint, allowing applications to feed explicitly scoped run events back through Kafka and Flink into the context graph.
-
-The shipped builder manifest demonstrates compilation. Domain applications can compose these pieces into their own workflows: deriving knowledge from group events, processing meeting media, or coordinating repository work.
-
-## Source map and configuration
+## Source map and chat configuration
 
 | Path | Purpose |
 | --- | --- |

@@ -18,17 +18,17 @@ Application builders define what their entities mean, how their data connects, w
 
 The application harness uses **SQL-defined processing and views with derived GraphQL queries, mutations, and subscriptions**. Temporal computations belong in Flink SQL. Mutations publish validated Kafka commands/events and return acceptance receipts; durable processing-status tracking remains a development item. Multiple Flink jobs run on ordinary Kubernetes resources, without the Flink Kubernetes operator.
 
-The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The [AX integration](docs/ax-investigations.md) connects task execution to the platform; the search reference application uses it for every assistant question.
+The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The [AX task execution](docs/ax.md) connects task execution to the platform; the search reference application uses it for every assistant question.
 
 ## AX task execution
 
 **AX and Substrate connect executable tasks to the context graph.** Applications delegate work to AX, Substrate runs it in a sandbox, and the platform supplies permissioned data and ingestion APIs. The same execution layer can host tooling that builds new applications on the platform.
 
-The workplace assistant is the deployed example: normal chat creates an AX task, retrieves evidence through the caller's SpiceDB permissions, and streams a cited answer. Follow-up questions retrieve fresh evidence. Concurrent requests wait for execution capacity. The coordinator uses DeepSeek for planning and answer generation; the sandbox executes the retrieval plan through scoped callbacks.
-
 For application builders, the AX workspace and builder image package the `cg` tools. A task can initialize and compile a bundle of schemas, Flink SQL, and SQL-backed APIs into reviewable release artifacts. The deployment workflow provisions the resulting APIs, Kafka topics, Flink jobs, and Iceberg tables. Tasks can also use delegated application credentials to query the graph or ingest events, including run events through the example trajectory endpoint.
 
-Read the [AX architecture, execution flow, and operating guide](docs/ax-investigations.md), or start with the [builder task manifest](services/harness/builder/ax.yaml) and [application harness](services/harness/README.md).
+The repository ships a workplace chat assistant as a reference application built on this foundation. Normal chat creates an AX task, retrieves evidence through the caller's SpiceDB permissions, and streams a cited answer. Follow-up questions retrieve fresh evidence. Concurrent requests wait for execution capacity. The coordinator uses DeepSeek for planning and answer generation; the sandbox executes the retrieval plan through scoped callbacks.
+
+Read the [AX architecture, execution flow, and operating guide](docs/ax.md), or start with the [builder task manifest](services/harness/builder/ax.yaml) and [application harness](services/harness/README.md).
 
 ## What the platform is for
 
@@ -479,7 +479,7 @@ Every assistant question runs through AX. The coordinator uses DeepSeek to plan 
 
 Follow-ups pass previous user questions as context and retrieve authorized evidence again. They do not reuse previous assistant text as an authoritative source. Malformed output can be regenerated once; fabricated IDs are never repaired by guessing. Stream errors clear the current answer. Citation validation proves provenance and access, not the semantic correctness of every model interpretation.
 
-Only authorized source text is sent to DeepSeek. Credentials and document bodies are not logged as operational messages or metrics labels. See the [search implementation](docs/search.md) and [AX execution flow](docs/ax-investigations.md).
+Only authorized source text is sent to DeepSeek. Credentials and document bodies are not logged as operational messages or metrics labels. See the [search implementation](docs/search.md) and [AX execution flow](docs/ax.md).
 
 ## Platform and reference-application screenshots
 

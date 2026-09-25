@@ -1,6 +1,6 @@
 # Reference application: permissioned workplace search
 
-This application and its Slack/GitHub ingestion adapters are examples built on the general-purpose Context Graph platform. Other data sources and products integrate through the same ingestion and serving contracts.
+This chat/search application ships as a reference example built on the general-purpose Context Graph platform. Its Slack/GitHub ingestion adapters are examples too. Other data sources and products integrate through the same ingestion and serving contracts.
 
 The search reference application is routed at `/search` through the dashboard forward on port `18088`, with its own React/shadcn frontend and search API. The read-only control frontend uses a separate forward on port `18089`. Use the existing local admin login. Tokens stay in browser memory. To recreate the forwards:
 
@@ -17,7 +17,7 @@ The local pool runs two workers, with matching execution admission in the coordi
 
 The coordinator calls DeepSeek directly for planning and synthesis. The sandbox receives its retrieval capability, callback configuration, and trusted CA. The UI shows execution progress and answer sections as they arrive, with inline source references and the source panel.
 
-The [AX guide](ax-investigations.md) describes the component architecture, capability flow, builder integration, image builds, and development bridges. Start those bridges alongside the application forward when using the separate local AX cluster.
+The [AX guide](ax.md) describes the component architecture, capability flow, builder integration, image builds, and development bridges. Start those bridges alongside the application forward when using the separate local AX cluster.
 
 ## Live ingestion
 

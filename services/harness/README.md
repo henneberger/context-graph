@@ -64,11 +64,11 @@ Flink jobs run as ordinary JobManager and TaskManager Deployments with Kubernete
 
 Promotion changes API Service selectors. It does not transfer input events or Flink state between different release namespaces. Each release has its own topics and tables. Repointing to an old release restores its routes, not data written only to a newer release. Production upgrades that require continuous history need an explicit replay/state migration plan; this prototype does not claim automatic zero-downtime state migration.
 
-## AX integration
+## Building with AX
 
 `builder/ax.yaml` is an AX manifest for invoking the same compiler tools. Build the pinned upstream runner with `scripts/build-ax-tools.sh`, then build `builder/Dockerfile`. AX receives workspace files and compiler tooling, not deployment credentials. The same client library can query and ingest using an explicitly delegated user identity.
 
-The [AX execution guide](../../docs/ax-investigations.md) connects the builder workflow to the running assistant example. Every assistant question uses AX: the coordinator delegates retrieval through run-specific capabilities, checks the caller's permissions, and streams a cited answer. The same execution infrastructure can run the builder task with its own workspace and compiler tools.
+The [AX execution guide](../../docs/ax.md) connects the builder workflow to the running assistant example. Every assistant question uses AX: the coordinator delegates retrieval through run-specific capabilities, checks the caller's permissions, and streams a cited answer. The same execution infrastructure can run the builder task with its own workspace and compiler tools.
 
 ## Current limits
 
