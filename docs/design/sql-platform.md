@@ -13,27 +13,21 @@ The user-selected mutation model is **Kafka commands/events with processing stat
 5. SpiceDB remains mandatory through commands, transformations, queries, subscriptions, and derived results. Query optimizations must preserve authorization before joins and aggregates.
 6. Polaris, private object storage, Iceberg, DuckDB `iceberg`, and `cache_httpfs` remain. Users receive authorized API results, not credentials for mixed-permission warehouse files.
 
-## What the da-app review found
+## Execution and optimization requirements
 
-Reviewed the local `da-app` working tree at HEAD `dd31dcd`. Paths below are relative to that repository; this is a source review, not a performance benchmark.
+These requirements define the target execution contract; they are not claims that every optimization is already implemented.
 
-| Source / behavior | Carry forward | Improve |
-|---|---|---|
-| `runtime/config/QueryConfig.java` and `GraphQLServer.executePostgresQuery` | Named SQL, bound values, explicit result cardinality, timeouts | Derive output types from the prepared SQL schema; centralize all execution bounds and cancellation |
-| `runtime/config/ParamSourceConfig.java` | Explicit argument, parent, JWT, and cursor parameter origins | Obtain identity only from verified context; separate trusted bindings from user arguments; never interpolate values into SQL |
-| `GraphQLServer.buildPaginationContext` and cursor signers | Page-size caps, fetching one extra row, signed cursors | Bind cursors to operation/version, workspace, subject, filters, ordering, snapshot, and expiry; use a unique tie-breaker |
-| `GraphQLSchemaResourceManager.ensureResources` | Deterministic runtime configuration and checksum-based deployment identity | Compile immutable application bundles without Kubernetes CRDs; build once per version |
-| `runner/FlinkSqlRunner.java` | SQL files, explain plans, catalog-derived schema/lineage intent | Submit all INSERTs in a job as one StatementSet; redact plan metadata and track the actual run lifecycle |
-| Kafka event mutations | A mutation can publish an event without making an analytical database writable | Add server-stamped scope, schema validation, command identity, retry semantics, and view-specific completion status |
-| Kafka/PostgreSQL subscriptions | Operations bind to change streams and argument-based filters | Shared consumers, explicit changelog semantics, bounded fan-out, current authorization, and reconnect/resume rules |
+| Concern | Required behavior |
+|---|---|
+| SQL execution | Named SQL, bound values, explicit result cardinality, centralized timeouts and cancellation; output types derived from the prepared SQL schema |
+| Parameter origins | Explicit argument, parent, identity, and cursor bindings; identity comes only from verified context; values are never interpolated into SQL |
+| Pagination | Page-size caps, one-extra-row fetching, and signed cursors bound to operation/version, workspace, subject, filters, ordering, snapshot, and expiry; a unique ordering tie-breaker |
+| Deployment identity | Immutable application bundles with deterministic configuration and content hashes; build once per version without Kubernetes CRDs |
+| Flink submission | Submit a job's INSERTs together as one StatementSet; track the actual run lifecycle and redact sensitive plan metadata |
+| Event mutations | Server-stamped scope, schema validation, command identity, retry semantics, and view-specific completion status |
+| Subscriptions | Shared consumers, explicit changelog semantics, bounded fan-out, current authorization, and reconnect/resume rules |
 
-Important differences from the requested design:
-
-- `GraphQLSchemaResourceManager` requires `spec.schema`; the prior project does not automatically derive its complete GraphQL schema from SQL.
-- `FlinkSqlRunner.runSql` waits on `getJobExecutionResult().get()` inside the loop over DML statements. A continuous first INSERT can prevent subsequent separate INSERTs from being submitted. An explicitly grouped statement set avoids that path, but independent streaming INSERTs need deliberate handling.
-- `KafkaSubscriptionPublisher` creates a consumer and random group for each subscriber; its `request(n)` explicitly provides no backpressure support. Keep the current platform's shared-consumer direction and strengthen routing rather than copying this implementation.
-- Pagination state is placed under one GraphQL-context key in the prior runtime. The replacement needs operation/field-local state so aliases and concurrent sibling resolvers cannot overwrite it.
-- No general selection-set pushdown or DataLoader batching implementation was found in the reviewed runtime. Those are proposed additions, not optimizations claimed to already exist there.
+GraphQL schema derivation must use validated SQL result schemas and command contracts. Pagination state must be operation/field-local so aliases and concurrent sibling resolvers cannot overwrite each other. Selection-set pushdown and DataLoader batching are proposed optimizations that must preserve the authorization boundary before adoption.
 
 ## Architecture
 

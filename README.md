@@ -18,7 +18,7 @@ Application builders define what their entities mean, how their data connects, w
 
 The application harness uses **SQL-defined processing and views with derived GraphQL queries, mutations, and subscriptions**. Temporal computations belong in Flink SQL. Mutations publish validated Kafka commands/events and return acceptance receipts; durable processing-status tracking remains a development item. Multiple Flink jobs run on ordinary Kubernetes resources, without the Flink Kubernetes operator.
 
-The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The [AX task execution](docs/ax.md) connects task execution to the platform; the search reference application uses it for every assistant question.
+The [SQL platform design](docs/design/sql-platform.md) defines operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The [AX task execution](docs/ax.md) connects task execution to the platform; the search reference application uses it for every assistant question.
 
 ## AX task execution
 
