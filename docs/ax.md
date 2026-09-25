@@ -130,7 +130,7 @@ After both clusters are running, start the development bridges:
 scripts/ax-local-bridges.sh
 ```
 
-Restart the bridges after a coordinator or AX server pod is replaced: Kubernetes port-forward attaches to a specific pod. Active streams and capabilities belong to the coordinator process; a replacement starts fresh sessions.
+Keep the bridge script running while using the local deployment. It reconnects each forward automatically when its connection closes, including after a coordinator or AX server pod is replaced. Active streams and capabilities belong to the coordinator process; a replacement starts fresh sessions. Requests interrupted by a disconnect must be retried.
 
 Inspect the worker pool and task status:
 
