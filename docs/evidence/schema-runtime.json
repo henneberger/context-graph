@@ -1,0 +1,16 @@
+{
+  "verifiedAt": "2026-09-25T02:48:39.277519+00:00",
+  "context": "docker-desktop",
+  "status": "passed",
+  "schemaRevision": "95f9c88",
+  "checks": {
+    "nativeVariantRoundTrip": true,
+    "schemaRejection": true,
+    "resourceReadAndWriteIsolation": true,
+    "anonymousReadDenied": true,
+    "temporalSqlCountAndSum": true,
+    "completedFlinkCheckpoints": true,
+    "replayedConnectorSearch": true
+  },
+  "fullMediaSecurityRegressionRerun": false
+}

@@ -2,7 +2,7 @@
 
 The storage replacement uses JSON Schema fields and native `_json_remainder VARIANT`, with no node/edge projection or data migration.
 
-Validation on the local Kubernetes platform includes an authenticated Kafka → Flink → Iceberg → DuckDB → GraphQL round trip preserving a nested object, mixed array, boolean, and JSON null. Schema-invalid input was rejected. A user without the resource grant could not retrieve the row. Flink completed checkpoints in object storage.
+Validation on the local Kubernetes platform includes an authenticated Kafka → Flink → Iceberg → DuckDB → GraphQL round trip preserving a nested object, mixed array, boolean, and JSON null. Schema-invalid input was rejected. A user without the resource grant could not retrieve the row. The reference temporal SQL query returned the expected count and sum. Flink completed checkpoints in object storage. Replayed connector documents were searchable in the `knowledge` workspace. The final smoke output is recorded in [sanitized evidence](evidence/schema-runtime.json).
 
 Reproduce that check with `scripts/schema-smoke.py --context YOUR_CONTEXT`, using the local development fixture credentials. The script submits a fresh marker and waits for that exact record; an empty or stale query result cannot pass.
 
