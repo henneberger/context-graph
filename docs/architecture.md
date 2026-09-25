@@ -1,5 +1,7 @@
 # Context graph architecture
 
+![context graph overview](diagrams/context-graph-overview.svg)
+
 ## Service boundaries
 
 Java 21, Maven modules: services/ingestion (Vert.x 5.2.0), services/processor (Flink 2.3.0), services/query (Vert.x 5.2.0, GraphQL Java, Reactor, DuckDB JDBC). Independent signed-in dashboard, local OIDC issuer, and SpiceDB authorization services. Mandatory security contracts are defined in [security architecture](security-architecture.md). Configuration is mounted read-only under /app/config. Polaris manages the Iceberg REST catalog; RustFS stores warehouse, media and new Flink recovery state in separate private buckets. Pod-local disk is used for staging. The old data volume is retained offline for migration rollback, and is no longer mounted by running services. See [governed lakehouse and federation](lakehouse.md). The local RustFS and PostgreSQL instances remain single-node availability limits.
@@ -44,7 +46,7 @@ Query service discovers schemas through the private Polaris REST catalog and exp
 
 ## Deployments and state
 
-Stateless replicas: readiness, startup probes, maxUnavailable=0, maxSurge=1, disruption budgets, graceful drain. Stateful Flink: incremental RocksDB checkpoints, one concurrent checkpoint, minimum pause and timeout, retained externalized checkpoints, S3 checkpoint/savepoint paths and verified native-format S3 savepoints. Kubernetes operator last-state/savepoint upgrade and HA metadata. Do not label restart-based job upgrades as uninterrupted output. Kafka buffers input while jobs recover. For continuous output across incompatible transformations, deploy a second version with independent group, output topics/tables, warm it to matching watermarks, switch query configuration, then retire old version. Never run two unrelated writers with the same transactional ID prefix.
+Stateless replicas: readiness, startup probes, maxUnavailable=0, maxSurge=1, disruption budgets, graceful drain. Stateful Flink: incremental RocksDB checkpoints, one concurrent checkpoint, minimum pause and timeout, retained externalized checkpoints, S3 checkpoint/savepoint paths and verified native-format S3 savepoints. Native Kubernetes JobManager/TaskManager deployments, savepoint-based restoration, and HA metadata. Do not label restart-based job upgrades as uninterrupted output. Kafka buffers input while jobs recover. For continuous output across incompatible transformations, deploy a second version with independent group, output topics/tables, warm it to matching watermarks, switch query configuration, then retire old version. Never run two unrelated writers with the same transactional ID prefix.
 
 Single-node local storage and a single PostgreSQL authorization datastore remain development availability limits. Kafka has three SASL_SSL brokers and role-separated ACLs, but replicas share the local storage node. Zero loss/zero interruption during node failure requires replicated Kafka, durable shared storage and sufficient cluster capacity. Established video uploads and websocket connections may reconnect during rollout.
 

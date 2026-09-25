@@ -12,7 +12,7 @@ Application builders define what their entities mean, how their data connects, w
 
 [Context model](#the-context-model) · [Architecture](#architecture) · [Build on the platform](#building-on-the-platform) · [Permissions](#security-and-permissions) · [Configuration](#configuration) · [Local setup](#local-setup) · [Operations](#operations-and-deployment) · [Screenshots](#platform-and-reference-application-screenshots) · [Current limits](#current-scope-and-development-priorities)
 
-[![Context Graph platform architecture](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
+[![Context Graph platform architecture](docs/diagrams/context-graph-overview.svg)](docs/diagrams/context-graph-overview.svg)
 
 ## SQL-backed application harness
 
@@ -21,6 +21,8 @@ The application harness uses **SQL-defined processing and views with derived Gra
 The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The [AX task execution](docs/ax.md) connects task execution to the platform; the search reference application uses it for every assistant question.
 
 ## AX task execution
+
+![AX application tasks and builder workflow](docs/diagrams/ax-task-execution.svg)
 
 **AX and Substrate connect executable tasks to the context graph.** Applications delegate work to AX, Substrate runs it in a sandbox, and the platform supplies permissioned data and ingestion APIs. The same execution layer can host tooling that builds new applications on the platform.
 
@@ -115,7 +117,7 @@ These concerns have established foundations: [W3C PROV](https://www.w3.org/TR/pr
 
 ## Architecture
 
-[Download the SVG](docs/diagrams/context-graph-overview.svg) · [PNG](docs/diagrams/context-graph-overview.png)
+[Platform data paths](docs/diagrams/context-graph-overview.svg) · [AX tasks and builders](docs/diagrams/ax-task-execution.svg) · [Permission boundaries](docs/diagrams/permission-boundaries.svg) · [Diagram guide](docs/diagrams/README.md)
 
 <details>
 <summary>Detailed component flow</summary>
@@ -228,7 +230,7 @@ flowchart TB
 
 The serving API is the data-access boundary; AX supplies task execution and workspaces. Applications use delegated access to read or write through the platform APIs. The application harness produces reviewable release artifacts for provisioning and deployment. The control plane has its own API and frontend. Reference applications also run as separate services; their browser routing is described under local setup.
 
-The [platform architecture](docs/architecture.md), [AX task execution](docs/ax.md), [lakehouse design](docs/lakehouse.md), and [packaged search application](docs/search.md) describe the individual paths. Earlier [interactive](docs/diagrams/context-graph-architecture.html), [SVG](docs/diagrams/context-graph-architecture.svg), and [PDF](docs/diagrams/context-graph-architecture.pdf) diagrams document the core platform; the diagram above includes the subsequently added connector and assistant services.
+The [platform architecture](docs/architecture.md), [AX task execution](docs/ax.md), [lakehouse design](docs/lakehouse.md), and [packaged search application](docs/search.md) describe the individual paths. The [diagram guide](docs/diagrams/README.md) explains the data paths, task execution, and authorization boundaries. All diagrams are editable SVGs with locally embedded project marks.
 
 ### Data path
 
@@ -247,7 +249,7 @@ These are pinned repository versions, not an assertion that every component is t
 |---|---|
 | Task runtime | AX and Substrate; pinned revisions in [upstream-lock.json](services/harness/builder/upstream-lock.json) |
 | Java services | Java 21, Vert.x 5.2.0 |
-| Streams | Kafka 4.1.1, Flink 2.3.0, Flink Kubernetes Operator 1.16.1 |
+| Streams | Kafka 4.1.1, Flink 2.3.0 on native Kubernetes deployments |
 | Tables / queries | Iceberg 1.11.0, DuckDB JDBC 1.5.5.1; `iceberg`, `cache_httpfs`, `fts` |
 | Catalog / storage | Polaris 1.7.0, RustFS 1.0.0-beta.8 |
 | Authorization | SpiceDB 1.56.2, verified OIDC JWTs |
@@ -383,6 +385,8 @@ Use the workspace in which the entity was provisioned. Kafka output topics feed 
 An application can combine these views with protected media, domain-specific queries, and its own interface. AI applications must preserve evidence references and maintain authorization through derived outputs; the included assistant demonstrates that pattern. External actions, workflow approvals, and write-back to source systems are application responsibilities, not a general action engine currently supplied here.
 
 ## Security and permissions
+
+![Permission enforcement across queries, events, media, and tasks](docs/diagrams/permission-boundaries.svg)
 
 ### Local entities
 

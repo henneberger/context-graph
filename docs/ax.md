@@ -9,6 +9,8 @@ AX has two roles in the platform:
 
 Applications supply the task logic and domain behavior. The shared platform supplies execution, authenticated data access, ingestion, storage, and processing. The repository ships a workplace chat application as one reference implementation. Its retrieval workflow, interface, and model choice belong to that application; other applications define their own task behavior on the same platform.
 
+![ax task execution](diagrams/ax-task-execution.svg)
+
 ## Task execution and platform access
 
 ```mermaid
