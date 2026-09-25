@@ -196,7 +196,7 @@ spec:
       terminationGracePeriodSeconds: 90
       containers:
       - name: query
-        image: context-graph/query:search-v1
+        image: context-graph/query:harness-v3
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081

@@ -1,0 +1,11 @@
+{
+  "ax": {
+    "repository": "https://github.com/google/ax",
+    "commit": "0b5427c4bb3d79889f5d536538a46421190ada9d"
+  },
+  "substrate": {
+    "repository": "https://github.com/agent-substrate/substrate",
+    "commit": "672533541dbfcd29084e4de2475267088bda3651",
+    "reason": "Matches the Substrate dependency in the pinned AX go.mod"
+  }
+}

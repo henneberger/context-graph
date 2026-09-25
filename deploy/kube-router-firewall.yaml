@@ -89,8 +89,9 @@ spec:
           httpGet:
             path: /healthz
             port: 20244
-          initialDelaySeconds: 10
-          periodSeconds: 3
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 8
         volumeMounts:
         - name: lib-modules
           mountPath: /lib/modules
@@ -100,11 +101,25 @@ spec:
           readOnly: false
         resources:
           requests:
-            cpu: 25m
+            cpu: 100m
             memory: 64Mi
           limits:
-            cpu: 500m
-            memory: 192Mi
+            cpu: '1'
+            memory: 256Mi
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 20244
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 20244
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
       hostNetwork: true
       tolerations:
       - effect: NoSchedule

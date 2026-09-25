@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: investigation-api
+  namespace: context-graph
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: investigation-api
+  template:
+    metadata:
+      labels:
+        app: investigation-api
+        context-graph-role: search-api
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9404'
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: search-api
+        image: context-graph/investigation-api:ax-v3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: service
+          containerPort: 8443
+        - name: metrics
+          containerPort: 9404
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /health/live
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: tls
+          mountPath: /run/search
+          readOnly: true
+        env:
+        - name: SEARCH_WORKSPACE
+          value: knowledge
+        - name: DEEPSEEK_MODEL
+          value: deepseek-flash
+        - name: AX_SERVER
+          value: host.docker.internal:28080
+        - name: AX_ATESPACE
+          value: context-search
+        - name: AX_INVESTIGATOR_IMAGE
+          value: localhost:5001/context-investigator@sha256:435d6ed887d72c859825dd1f54fdbfb0164e3c78d0a0cabde906b28c452d1516
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: AX_CALLBACK_HOST
+          value: host.docker.internal
+        - name: AX_CALLBACK_PORT
+          value: '28443'
+      volumes:
+      - name: tls
+        secret:
+          secretName: search-security
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: investigation-api
+  namespace: context-graph
+spec:
+  selector:
+    app: investigation-api
+  ports:
+  - name: https
+    port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: investigation-api
+  namespace: context-graph
+spec:
+  podSelector:
+    matchLabels:
+      app: investigation-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: search-ui
+    ports:
+    - port: 8443
+      protocol: TCP
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: query
+    ports:
+    - port: 8081
+      protocol: TCP
+  - ports:
+    - port: 28080
+      protocol: TCP
+    - port: 443
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: investigation-query
+  namespace: context-graph
+spec:
+  podSelector:
+    matchLabels:
+      app: query
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: investigation-api
+    ports:
+    - port: 8081
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: investigation-ui
+  namespace: context-graph
+spec:
+  podSelector:
+    matchLabels:
+      app: search-ui
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: investigation-api
+    ports:
+    - port: 8443
+      protocol: TCP

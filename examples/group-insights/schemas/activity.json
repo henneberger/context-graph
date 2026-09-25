@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["entityId","text"],"properties":{"entityId":{"type":"string","minLength":1,"maxLength":256},"eventTime":{"type":"string","format":"date-time"},"text":{"type":"string","maxLength":16000},"author":{"type":"string","maxLength":256},"value":{"type":"number"}},"additionalProperties":false}

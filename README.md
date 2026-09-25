@@ -14,11 +14,11 @@ Application builders define what their entities mean, how their data connects, w
 
 [![Context Graph platform architecture](docs/diagrams/context-graph-overview.png)](docs/diagrams/context-graph-overview.svg)
 
-## SQL-backed architecture direction
+## SQL-backed application harness
 
-The next architecture uses **SQL-defined processing and views with derived GraphQL queries, mutations, and subscriptions**. Temporal computations belong in Flink SQL. Mutations publish validated Kafka commands/events and report processing status. Multiple Flink jobs run on ordinary Kubernetes resources, without the Flink Kubernetes operator.
+The application harness uses **SQL-defined processing and views with derived GraphQL queries, mutations, and subscriptions**. Temporal computations belong in Flink SQL. Mutations publish validated Kafka commands/events and return acceptance receipts; durable processing-status tracking remains a development item. Multiple Flink jobs run on ordinary Kubernetes resources, without the Flink Kubernetes operator.
 
-The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. **This is the target design; the current runtime still uses the legacy job configuration and operator deployment described below.**
+The [SQL platform design](docs/design/sql-platform.md) records the review of `da-app`, the operation contracts, authorization-preserving optimizations, and migration gates. The [application harness](services/harness/README.md) implements a bounded SQL bundle compiler and release workflow. The core example job retains its legacy transformation configuration but now runs on standard Kubernetes Deployments. The optional [AX investigation integration](docs/ax-investigations.md) delegates permissioned retrieval from the search reference application to Substrate sandboxes.
 
 ## What the platform is for
 
@@ -562,7 +562,7 @@ KUBE_CONTEXT="$KUBE_CONTEXT" STORAGE_NODE="$STORAGE_NODE" \
 
 The default build preserves the per-service tags used in the manifests. If you choose a custom `IMAGE_TAG`, use the same value for build and deploy.
 
-Provisioning creates local certificates/credentials under `.runtime/security/`, Kubernetes Secrets, role-separated database/storage/broker identities, RustFS/Polaris resources, the operator, and application workloads. Keep those private files and backups secure. They are intentionally excluded from Git.
+Provisioning creates local certificates/credentials under `.runtime/security/`, Kubernetes Secrets, role-separated database/storage/broker identities, RustFS/Polaris resources, native Flink Deployments, and application workloads. Keep those private files and backups secure. They are intentionally excluded from Git.
 
 This is the documented deployment workflow for the implemented profile, not a promise that a clean installation on every Kubernetes distribution has been tested. Existing local storage migrations and recovery checks are documented separately in [lakehouse operations](docs/lakehouse.md).
 
@@ -673,7 +673,7 @@ Recorded evidence includes [streamed Mari answers](docs/evidence/streaming-searc
 
 ```text
 config/                    Endpoint, schema, job, query, connector, and ACL configuration
-deploy/                    Kubernetes manifests and Flink operator settings
+deploy/                    Kubernetes manifests, native Flink jobs, and optional AX deployment
 docs/                      Architecture, security, operations, screenshots, evidence
 generators/                Authenticated JSON, image, and video load tools
 scripts/                   Provisioning, rendering, deployment, migration, validation

@@ -1,6 +1,6 @@
 import importlib.util,json,unittest
 from unittest.mock import patch
-spec=importlib.util.spec_from_file_location('search_api','services/search-api/server.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+import server as m
 DOC={'id':'d','revision':'one','url':'https://github.com/MariHQ/mari/issues/1','content':'evidence','source':'github'}
 BLOCK={'text':'A grounded statement.','citations':['S1']}
 class SearchTest(unittest.TestCase):

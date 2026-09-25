@@ -1,0 +1,58 @@
+diff --git a/internal/controller/reconciler.go b/internal/controller/reconciler.go
+index 8a3cde1..de1f844 100644
+--- a/internal/controller/reconciler.go
++++ b/internal/controller/reconciler.go
+@@ -175,7 +175,7 @@ func (r *TaskReconciler) Reconcile(ctx context.Context, task *v1alpha1.Task, wor
+ 
+ 		tmpl, err := r.client.EnsureActorTemplateWithImage(ctx, templateAtespace, templateName, atespace, customTemplateName, task.Spec.Image, extraEnv)
+ 		if err != nil {
+-			slog.Warn("could not create custom ActorTemplate, falling back to default template", "error", err)
++			return nil, fmt.Errorf("create task-specific template: %w", err)
+ 		} else if tmpl != nil && tmpl.Metadata != nil {
+ 			templateAtespace = tmpl.Metadata.Atespace
+ 			templateName = tmpl.Metadata.Name
+diff --git a/internal/substrate/client.go b/internal/substrate/client.go
+index e3a32d2..4d795a4 100644
+--- a/internal/substrate/client.go
++++ b/internal/substrate/client.go
+@@ -31,6 +31,7 @@ import (
+ 	"google.golang.org/grpc/credentials"
+ 	"google.golang.org/grpc/credentials/insecure"
+ 	"google.golang.org/grpc/status"
++	"gopkg.in/yaml.v3"
+ )
+ 
+ // ClientOptions configures connection to the Substrate Control API server.
+@@ -290,6 +291,26 @@ func (c *Client) EnsureActorTemplateWithImage(ctx context.Context, baseAtespace,
+ 	}
+ 
+ 	tmpl := BuildActorTemplate(targetAtespace, targetTemplate, image, envMap, nil, "")
++	// Propagate declared task limits to the sandbox instead of relying on worker size.
++	cpu, memory := "1", "512Mi"
++	if raw := envMap["AX_TASK_YAML"]; raw != "" {
++		var task v1alpha1.Task
++		if err := yaml.Unmarshal([]byte(raw), &task); err != nil {
++			return nil, fmt.Errorf("invalid task configuration: %w", err)
++		}
++		limits := task.GetSpec().GetResources().GetLimits()
++		if limits.GetCpu() != "" {
++			cpu = limits.GetCpu()
++		}
++		if limits.GetMemory() != "" {
++			memory = limits.GetMemory()
++		}
++	}
++	if envMap["RUN_CAPABILITY"] != "" {
++		tmpl.SnapshotsConfig.OnResume.FromData = ateapipb.ResumeSource_RESUME_SOURCE_COLD_BOOT
++	}
++	tmpl.Resources = &ateapipb.Resources{Limits: []*ateapipb.Limits{{Name: "cpu", Quantity: cpu}, {Name: "memory", Quantity: memory}}}
++
+ 	req := &ateapipb.CreateActorTemplateRequest{
+ 		ActorTemplate: tmpl,
+ 	}
+@@ -444,5 +465,3 @@ func (c *Client) DeleteActorTemplate(ctx context.Context, atespace, templateName
+ 	}
+ 	return nil
+ }
+-
+-

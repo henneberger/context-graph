@@ -1,61 +1,70 @@
-apiVersion: flink.apache.org/v1beta1
-kind: FlinkDeployment
+apiVersion: v1
+kind: ServiceAccount
 metadata:
-  name: context-secure-v1
+  name: flink-runtime
+  namespace: context-graph
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: flink-runtime
+  namespace: context-graph
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flink-runtime
+  namespace: context-graph
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flink-runtime
+subjects:
+- kind: ServiceAccount
+  name: flink-runtime
+  namespace: context-graph
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: context-secure-v1-jobmanager
   namespace: context-graph
 spec:
-  image: context-graph/processor:observability-v1
-  imagePullPolicy: IfNotPresent
-  flinkVersion: v2_3
-  serviceAccount: flink
-  flinkConfiguration:
-    taskmanager.numberOfTaskSlots: '2'
-    jobmanager.memory.off-heap.size: 64m
-    jobmanager.memory.jvm-overhead.min: 128m
-    kubernetes.jobmanager.cpu.limit-factor: '5.0'
-    kubernetes.taskmanager.cpu.limit-factor: '4.0'
-    state.backend.type: rocksdb
-    execution.checkpointing.incremental: 'true'
-    execution.checkpointing.interval: 10 s
-    execution.checkpointing.min-pause: 5 s
-    execution.checkpointing.max-concurrent-checkpoints: '1'
-    execution.checkpointing.timeout: 120 s
-    execution.checkpointing.storage: filesystem
-    execution.checkpointing.dir: s3://context-recovery/checkpoints
-    execution.checkpointing.savepoint-dir: s3://context-recovery/savepoints
-    execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
-    high-availability.type: kubernetes
-    high-availability.storageDir: s3://context-recovery/ha/context-secure-v1
-    restart-strategy.type: exponential-delay
-    rest.flamegraph.enabled: 'false'
-    kubernetes.operator.periodic.savepoint.interval: 1 h
-    kubernetes.operator.savepoint.history.max.count: '5'
-    kubernetes.operator.job.upgrade.last-state-fallback.enabled: 'false'
-    env.java.opts.all: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/app/secrets/kafka.truststore.p12
-      -Djavax.net.ssl.trustStorePassword=changeit
-    s3.endpoint: https://object-storage:9000
-    s3.path.style.access: 'true'
-    s3.connection.ssl.enabled: 'true'
-    kubernetes.operator.job.restart.failed: 'true'
-    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
-    metrics.reporter.prom.port: '9249'
-  jobManager:
-    replicas: 2
-    resources:
-      requests:
-        memory: 1280Mi
-        cpu: '0.2'
-  taskManager:
-    replicas: 1
-    resources:
-      requests:
-        memory: 1536Mi
-        cpu: '0.5'
-  podTemplate:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: context-secure-v1
+      component: jobmanager
+  template:
     metadata:
       labels:
         context-graph-role: processor
         context-graph-control-plane: 'true'
+        app: context-secure-v1
+        component: jobmanager
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9249'
@@ -67,7 +76,7 @@ spec:
         fsGroup: 2000
       terminationGracePeriodSeconds: 90
       containers:
-      - name: flink-main-container
+      - name: flink
         env:
         - name: KAFKA_BOOTSTRAP_SERVERS
           value: secure-kafka:9092
@@ -104,6 +113,79 @@ spec:
               key: secret-key
         - name: AWS_REGION
           value: us-east-1
+        - name: FLINK_PROPERTIES
+          value: 'taskmanager.numberOfTaskSlots: 2
+
+            jobmanager.memory.off-heap.size: 64m
+
+            jobmanager.memory.jvm-overhead.min: 128m
+
+            state.backend.type: rocksdb
+
+            execution.checkpointing.incremental: true
+
+            execution.checkpointing.interval: 10 s
+
+            execution.checkpointing.min-pause: 5 s
+
+            execution.checkpointing.max-concurrent-checkpoints: 1
+
+            execution.checkpointing.timeout: 120 s
+
+            execution.checkpointing.storage: filesystem
+
+            execution.checkpointing.dir: s3://context-recovery/checkpoints
+
+            execution.checkpointing.savepoint-dir: s3://context-recovery/savepoints
+
+            execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+
+            high-availability.type: kubernetes
+
+            high-availability.storageDir: s3://context-recovery/ha/context-secure-v1-native
+
+            restart-strategy.type: exponential-delay
+
+            rest.flamegraph.enabled: false
+
+            s3.endpoint: https://object-storage:9000
+
+            s3.path.style.access: true
+
+            s3.connection.ssl.enabled: true
+
+            metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+
+            metrics.reporter.prom.port: 9249
+
+            jobmanager.rpc.address: context-secure-v1
+
+            rest.address: context-secure-v1-rest
+
+            rest.bind-address: 0.0.0.0
+
+            rest.port: 8081
+
+            jobmanager.rpc.port: 6123
+
+            blob.server.port: 6124
+
+            taskmanager.rpc.port: 6122
+
+            taskmanager.data.port: 6121
+
+            jobmanager.memory.process.size: 768m
+
+            taskmanager.memory.process.size: 1280m
+
+            high-availability.cluster-id: context-secure-v1-native
+
+            kubernetes.namespace: context-graph
+
+            kubernetes.cluster-id: context-secure-v1-native'
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/app/secrets/kafka.truststore.p12
+            -Djavax.net.ssl.trustStorePassword=changeit
         volumeMounts:
         - name: config
           mountPath: /app/config
@@ -114,6 +196,24 @@ spec:
         ports:
         - containerPort: 9249
           name: metrics
+        image: context-graph/processor:harness-v1
+        args:
+        - standalone-job
+        - --job-classname
+        - io.contextgraph.processor.ContextGraphJob
+        - /app/config/jobs.yaml
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /overview
+            port: 8081
+          periodSeconds: 5
+          timeoutSeconds: 3
       volumes:
       - name: config
         configMap:
@@ -122,24 +222,243 @@ spec:
         secret:
           secretName: security-processor
           defaultMode: 288
-  job:
-    jarURI: local:///opt/flink/usrlib/processor.jar
-    entryClass: io.contextgraph.processor.ContextGraphJob
-    args:
-    - /app/config/jobs.yaml
-    parallelism: 2
-    upgradeMode: savepoint
-    state: running
-    allowNonRestoredState: false
+      serviceAccountName: flink-runtime
 ---
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: flink-secure-jobmanager
+  name: context-secure-v1-taskmanager
   namespace: context-graph
 spec:
-  minAvailable: 1
+  replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: context-secure-v1
-      component: jobmanager
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        context-graph-role: processor
+        context-graph-control-plane: 'true'
+        app: context-secure-v1
+        component: taskmanager
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9249'
+        prometheus.io/path: /metrics
+    spec:
+      securityContext:
+        runAsUser: 9999
+        runAsGroup: 2000
+        fsGroup: 2000
+      terminationGracePeriodSeconds: 90
+      containers:
+      - name: flink
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: secure-kafka:9092
+        - name: JOB_ID
+          value: context-secure-v1
+        - name: KAFKA_CLIENT_CONFIG
+          value: /app/secrets/kafka.properties
+        - name: CONFIG_PATH
+          value: /app/config/jobs.yaml
+        - name: WAREHOUSE_URI
+          value: context
+        - name: CHECKPOINT_URI
+          value: s3://context-recovery/checkpoints
+        - name: SAVEPOINT_URI
+          value: s3://context-recovery/savepoints
+        - name: POLARIS_URI
+          value: https://polaris:8443/api/catalog
+        - name: POLARIS_WAREHOUSE
+          value: context
+        - name: POLARIS_CREDENTIAL
+          valueFrom:
+            secretKeyRef:
+              name: polaris-processor
+              key: credential
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-recovery
+              key: access-key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: object-storage-recovery
+              key: secret-key
+        - name: AWS_REGION
+          value: us-east-1
+        - name: FLINK_PROPERTIES
+          value: 'taskmanager.numberOfTaskSlots: 2
+
+            jobmanager.memory.off-heap.size: 64m
+
+            jobmanager.memory.jvm-overhead.min: 128m
+
+            state.backend.type: rocksdb
+
+            execution.checkpointing.incremental: true
+
+            execution.checkpointing.interval: 10 s
+
+            execution.checkpointing.min-pause: 5 s
+
+            execution.checkpointing.max-concurrent-checkpoints: 1
+
+            execution.checkpointing.timeout: 120 s
+
+            execution.checkpointing.storage: filesystem
+
+            execution.checkpointing.dir: s3://context-recovery/checkpoints
+
+            execution.checkpointing.savepoint-dir: s3://context-recovery/savepoints
+
+            execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+
+            high-availability.type: kubernetes
+
+            high-availability.storageDir: s3://context-recovery/ha/context-secure-v1-native
+
+            restart-strategy.type: exponential-delay
+
+            rest.flamegraph.enabled: false
+
+            s3.endpoint: https://object-storage:9000
+
+            s3.path.style.access: true
+
+            s3.connection.ssl.enabled: true
+
+            metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+
+            metrics.reporter.prom.port: 9249
+
+            jobmanager.rpc.address: context-secure-v1
+
+            rest.address: context-secure-v1-rest
+
+            rest.bind-address: 0.0.0.0
+
+            rest.port: 8081
+
+            jobmanager.rpc.port: 6123
+
+            blob.server.port: 6124
+
+            taskmanager.rpc.port: 6122
+
+            taskmanager.data.port: 6121
+
+            jobmanager.memory.process.size: 768m
+
+            taskmanager.memory.process.size: 1280m
+
+            high-availability.cluster-id: context-secure-v1-native
+
+            kubernetes.namespace: context-graph
+
+            kubernetes.cluster-id: context-secure-v1-native'
+        - name: JAVA_TOOL_OPTIONS
+          value: -XX:ActiveProcessorCount=2 -Djavax.net.ssl.trustStore=/app/secrets/kafka.truststore.p12
+            -Djavax.net.ssl.trustStorePassword=changeit
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: kafka-credentials
+          mountPath: /app/secrets
+          readOnly: true
+        ports:
+        - containerPort: 9249
+          name: metrics
+        image: context-graph/processor:harness-v1
+        args:
+        - taskmanager
+        resources:
+          requests:
+            cpu: 100m
+            memory: 1024Mi
+          limits:
+            memory: 1536Mi
+      volumes:
+      - name: config
+        configMap:
+          name: context-config
+      - name: kafka-credentials
+        secret:
+          secretName: security-processor
+          defaultMode: 288
+      serviceAccountName: flink-runtime
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: context-secure-v1
+  namespace: context-graph
+spec:
+  selector:
+    app: context-secure-v1
+    component: jobmanager
+  ports:
+  - name: rpc
+    port: 6123
+  - name: blob
+    port: 6124
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: context-secure-v1-rest
+  namespace: context-graph
+spec:
+  selector:
+    app: context-secure-v1
+    component: jobmanager
+  ports:
+  - name: rest
+    port: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: core-flink-internal
+  namespace: context-graph
+spec:
+  podSelector:
+    matchLabels:
+      app: context-secure-v1
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: context-secure-v1
+    ports:
+    - port: 6121
+      protocol: TCP
+    - port: 6122
+      protocol: TCP
+    - port: 6123
+      protocol: TCP
+    - port: 6124
+      protocol: TCP
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: context-secure-v1
+    ports:
+    - port: 6121
+      protocol: TCP
+    - port: 6122
+      protocol: TCP
+    - port: 6123
+      protocol: TCP
+    - port: 6124
+      protocol: TCP

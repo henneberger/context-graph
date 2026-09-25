@@ -330,7 +330,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: search-ui
-        image: context-graph/search-ui:search-v1
+        image: context-graph/search-ui:ax-v2
         imagePullPolicy: IfNotPresent
         ports:
         - name: service

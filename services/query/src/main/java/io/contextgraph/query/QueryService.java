@@ -85,25 +85,34 @@ public final class QueryService {
       types.append("type ").append(type).append(" {\n");for(var c:table.columns())types.append(c.name()).append(": ").append(graphType(c.type())).append('\n');types.append("}\n");
       sdl.append(field).append("(limit: Int = 100): [").append(type).append("!]!\n");query.dataFetcher(field,env->CompletableFuture.supplyAsync(()->{try{return db.execute(table,policies.get(table.name()),"SELECT * FROM source LIMIT :limit",env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);}catch(Exception e){throw new CompletionException(e);}},workers));
     });
-    sdl.append("}\n").append(types).append("type Subscription {\n");TypeRuntimeWiring.Builder subscriptions=TypeRuntimeWiring.newTypeWiring("Subscription");
+    sdl.append("}\n").append(types);if(config.path("subscriptions").size()>0)sdl.append("type Subscription {\n");TypeRuntimeWiring.Builder subscriptions=TypeRuntimeWiring.newTypeWiring("Subscription");
     config.path("subscriptions").fields().forEachRemaining(entry->{JsonNode q=entry.getValue();sdl.append(q.path("signature").asText()).append('\n');List<String> topics=new ArrayList<>();q.path("topics").forEach(t->topics.add(t.asText()));subscriptions.dataFetcher(entry.getKey(),env->CompletableFuture.supplyAsync(()->{
+      if(!live.ready())throw new IllegalStateException("Subscriptions unavailable");
       SecurityContext context=env.getGraphQlContext().get("security");permissions.workspace(context,"access");String entity=env.getArgument("entityId");
       if(entity!=null)permissions.require(context,AccessControl.resourceId(context.workspaceId(),entity));
       return live.stream(topics,q.path("entityField").asText("entityId"),entity,q.path("wrap").asBoolean(),context,permissions,authScheduler);
     },workers));});
-    sdl.append("}\n");wiring.type(query).type(subscriptions);graph=GraphQL.newGraphQL(new SchemaGenerator().makeExecutableSchema(new SchemaParser().parse(sdl.toString()),wiring.build())).defaultDataFetcherExceptionHandler(parameters->CompletableFuture.completedFuture(graphql.execution.DataFetcherExceptionHandlerResult.newResult().error(GraphqlErrorBuilder.newError(parameters.getDataFetchingEnvironment()).message("Request denied or query unavailable").build()).build())).instrumentation(new graphql.execution.instrumentation.ChainedInstrumentation(List.of(new graphql.analysis.MaxQueryDepthInstrumentation(12),new graphql.analysis.MaxQueryComplexityInstrumentation(1000)))).build();schemaHealthy=true;
+    if(config.path("subscriptions").size()>0){sdl.append("}\n");wiring.type(subscriptions);}
+    if(config.path("mutations").size()>0) {
+      sdl.append("type Mutation {\n");var mutations=TypeRuntimeWiring.newTypeWiring("Mutation");
+      config.path("mutations").fields().forEachRemaining(e->{var definition=e.getValue();sdl.append(definition.path("signature").asText()).append('\n');
+        mutations.dataFetcher(e.getKey(),env->CompletableFuture.supplyAsync(()->{try{return EventMutations.publish(definition.path("path").asText(),env.getArgument("input"),env.getGraphQlContext().get("authorization"),env.getGraphQlContext().get("security"),access);}catch(Exception error){throw new CompletionException(error);}},workers));});
+      sdl.append("}\n");wiring.type(mutations);
+    }
+    wiring.type(query);graph=GraphQL.newGraphQL(new SchemaGenerator().makeExecutableSchema(new SchemaParser().parse(sdl.toString()),wiring.build())).defaultDataFetcherExceptionHandler(parameters->CompletableFuture.completedFuture(graphql.execution.DataFetcherExceptionHandlerResult.newResult().error(GraphqlErrorBuilder.newError(parameters.getDataFetchingEnvironment()).message("Request denied or query unavailable").build()).build())).instrumentation(new graphql.execution.instrumentation.ChainedInstrumentation(List.of(new graphql.analysis.MaxQueryDepthInstrumentation(12),new graphql.analysis.MaxQueryComplexityInstrumentation(1000)))).build();schemaHealthy=true;
   }
   static String graphType(String type){return switch(type){case "int"->"Int";case "long"->"Long";case "float","double"->"Float";case "boolean"->"Boolean";default->type.startsWith("{")?"JSON":"String";};}
   ExecutionInput input(JsonObject body,SecurityContext context){return ExecutionInput.newExecutionInput().query(body.getString("query", "")).operationName(body.getString("operationName")).variables(body.getJsonObject("variables",new JsonObject()).getMap()).graphQLContext(Map.of("security",context)).build();}
   public void start(){
     HttpServerOptions httpOptions=serverOptions();
     HttpMetrics.start();
-    Router router=Router.router(vertx);router.route().handler(c->{long began=System.nanoTime();c.addBodyEndHandler(v->HttpMetrics.observe(HttpMetrics.route(c.request().path()),c.response().getStatusCode(),began));c.next();});router.get("/health/live").handler(c->c.response().end("ok"));router.get("/health/ready").handler(c->c.response().setStatusCode(!draining&&schemaHealthy&&live.ready()?200:503).end());
+    Router router=Router.router(vertx);router.route().handler(c->{long began=System.nanoTime();c.addBodyEndHandler(v->HttpMetrics.observe(HttpMetrics.route(c.request().path()),c.response().getStatusCode(),began));c.next();});router.get("/health/live").handler(c->c.response().end("ok"));router.get("/health/ready").handler(c->c.response().setStatusCode(!draining&&schemaHealthy?200:503).end());
+    router.get("/health/subscriptions").handler(c->c.response().setStatusCode(!draining&&schemaHealthy&&live.ready()?200:503).end());
     router.post("/graphql").handler(c->{c.request().pause();
       try {CompletableFuture.supplyAsync(()->access.authenticate(c.request().getHeader("Authorization"),c.request().getHeader("X-Workspace-Id")),workers).whenComplete((context,error)->vertx.runOnContext(v->{if(error!=null){c.response().putHeader("Connection","close").setStatusCode(authStatus(error)).end("Authentication or authorization failed");return;}c.put("security",context);c.next();c.request().resume();}));}
       catch(RejectedExecutionException e){c.response().setStatusCode(503).end();}
     });
-    router.post("/graphql").handler(BodyHandler.create().setBodyLimit(64*1024)).handler(c->{try{graph.executeAsync(input(c.body().asJsonObject(),c.get("security"))).whenComplete((result,error)->vertx.runOnContext(v->{if(error!=null)c.response().setStatusCode(500).end();else if(result.getData() instanceof Publisher<?>)c.response().setStatusCode(400).end("Use graphql-transport-ws for subscriptions");else {if(!result.getErrors().isEmpty())HttpMetrics.event("graphql_error");c.response().putHeader("content-type","application/json").end(Json.encode(result.toSpecification()));}}));}catch(Exception e){c.response().setStatusCode(400).end();}});
+    router.post("/graphql").handler(BodyHandler.create().setBodyLimit(64*1024)).handler(c->{try{graph.executeAsync(input(c.body().asJsonObject(),c.get("security")).transform(b->b.graphQLContext(Map.of("authorization",c.request().getHeader("Authorization"))))).whenComplete((result,error)->vertx.runOnContext(v->{if(error!=null)c.response().setStatusCode(500).end();else if(result.getData() instanceof Publisher<?>)c.response().setStatusCode(400).end("Use graphql-transport-ws for subscriptions");else {if(!result.getErrors().isEmpty())HttpMetrics.event("graphql_error");c.response().putHeader("content-type","application/json").end(Json.encode(result.toSpecification()));}}));}catch(Exception e){c.response().setStatusCode(400).end();}});
     server=vertx.createHttpServer(httpOptions).webSocketHandler(this::socket).requestHandler(router);
     server.listen(port).onFailure(e->{e.printStackTrace();System.exit(1);});
     Runtime.getRuntime().addShutdownHook(new Thread(this::close));
@@ -117,14 +126,14 @@ public final class QueryService {
   }
   private void socket(ServerWebSocket ws){
     if(draining||!ws.path().equals("/graphql")||!"graphql-transport-ws".equals(ws.subProtocol())){ws.close((short)4406,"Unsupported protocol");return;}
-    sockets.add(ws);Map<String,Disposable> operations=new ConcurrentHashMap<>();Map<String,Object> pending=new ConcurrentHashMap<>();boolean[] initialized={false},initializing={false};SecurityContext[] session={null};long[] expiryTimer={-1};
+    sockets.add(ws);Map<String,Disposable> operations=new ConcurrentHashMap<>();Map<String,Object> pending=new ConcurrentHashMap<>();boolean[] initialized={false},initializing={false};SecurityContext[] session={null};String[] authorization={null};long[] expiryTimer={-1};
     long timeout=vertx.setTimer(5000,id->{if(!initialized[0])ws.close((short)4408,"Initialization timeout");});
     ws.setWriteQueueMaxSize(256*1024);
     ws.textMessageHandler(text->{try{JsonObject message=new JsonObject(text);String id=message.getString("id"),type=message.getString("type");switch(type){
       case "connection_init"->{if(initialized[0]||initializing[0]){ws.close((short)4429,"Already initialized");return;}initializing[0]=true;
         JsonObject payload=message.getJsonObject("payload",new JsonObject());
         CompletableFuture.supplyAsync(()->access.authenticate(payload.getString("authorization"),payload.getString("workspaceId")),workers).whenComplete((context,error)->vertx.runOnContext(v->{
-          if(ws.isClosed())return;if(error!=null){ws.close((short)4401,"Authentication failed");return;}session[0]=context;initialized[0]=true;
+          if(ws.isClosed())return;if(error!=null){ws.close((short)4401,"Authentication failed");return;}session[0]=context;authorization[0]=payload.getString("authorization");initialized[0]=true;
           long delay=Math.max(1,context.expiresAtEpochSecond()*1000-System.currentTimeMillis());expiryTimer[0]=vertx.setTimer(delay,t->ws.close((short)4401,"Session expired"));
           send(ws,new JsonObject().put("type","connection_ack"));
         }));}
@@ -132,7 +141,7 @@ public final class QueryService {
       case "pong"->{}
       case "complete"->{pending.remove(id);Disposable d=operations.remove(id);if(d!=null)d.dispose();}
       case "subscribe"->{if(!initialized[0]){ws.close((short)4401,"Unauthorized");return;}if(id==null||id.isBlank()){ws.close((short)4400,"Operation id required");return;}Object token=new Object();if(pending.putIfAbsent(id,token)!=null){ws.close((short)4409,"Duplicate operation");return;}if(pending.size()>64){ws.close((short)4429,"Too many operations");return;}
-        CompletableFuture.supplyAsync(()->{permissions.workspace(session[0],"access");return input(message.getJsonObject("payload"),session[0]);},workers).thenCompose(graph::executeAsync).whenComplete((result,error)->vertx.runOnContext(v->{if(ws.isClosed()||pending.get(id)!=token)return;if(error!=null||!result.getErrors().isEmpty()){send(ws,new JsonObject().put("id",id).put("type","error").put("payload",error!=null?List.of(Map.of("message","Execution failed")):result.getErrors().stream().map(GraphQLError::toSpecification).toList()));pending.remove(id,token);return;}
+        CompletableFuture.supplyAsync(()->{permissions.workspace(session[0],"access");return input(message.getJsonObject("payload"),session[0]).transform(b->b.graphQLContext(Map.of("authorization",authorization[0])));},workers).thenCompose(graph::executeAsync).whenComplete((result,error)->vertx.runOnContext(v->{if(ws.isClosed()||pending.get(id)!=token)return;if(error!=null||!result.getErrors().isEmpty()){send(ws,new JsonObject().put("id",id).put("type","error").put("payload",error!=null?List.of(Map.of("message","Execution failed")):result.getErrors().stream().map(GraphQLError::toSpecification).toList()));pending.remove(id,token);return;}
           if(result.getData() instanceof Publisher<?> publisher){Disposable d=Flux.from(publisher).subscribe(item->send(ws,new JsonObject().put("id",id).put("type","next").put("payload",((ExecutionResult)item).toSpecification())),err->{send(ws,new JsonObject().put("id",id).put("type","error").put("payload",List.of(Map.of("message","Subscription overflow or failure"))));pending.remove(id,token);operations.remove(id);},()->{send(ws,new JsonObject().put("id",id).put("type","complete"));pending.remove(id,token);operations.remove(id);});operations.put(id,d);}else {send(ws,new JsonObject().put("id",id).put("type","next").put("payload",result.toSpecification()));send(ws,new JsonObject().put("id",id).put("type","complete"));pending.remove(id,token);}
         }));}
       default->ws.close((short)4400,"Invalid message");

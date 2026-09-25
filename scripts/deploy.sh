@@ -32,17 +32,6 @@ kubectl --context "$context" -n context-graph rollout status statefulset/spicedb
 "$python" scripts/deploy-lakehouse.py --context "$context" --node "$node"
 "$python" scripts/provision-control.py --context "$context"
 "$python" scripts/provision-connectors.py --context "$context"
-chart=.runtime/flink-operator-1.16.1.tgz
-if [[ ! -f "$chart" || ! -f "$chart.sha512" ]]; then
-  curl -fsSL https://downloads.apache.org/flink/flink-kubernetes-operator-1.16.1/flink-kubernetes-operator-1.16.1-helm.tgz -o "$chart"
-  curl -fsSL https://downloads.apache.org/flink/flink-kubernetes-operator-1.16.1/flink-kubernetes-operator-1.16.1-helm.tgz.sha512 -o "$chart.sha512"
-fi
-"$python" - "$chart" <<'PY'
-import hashlib,pathlib,sys
-p=pathlib.Path(sys.argv[1]); expected=p.with_name(p.name+'.sha512').read_text().split()[0]
-assert hashlib.sha512(p.read_bytes()).hexdigest()==expected,'Helm chart checksum mismatch'
-PY
-helm upgrade --install context-flink-operator "$chart" --kube-context "$context" --namespace context-graph --values deploy/operator-values.yaml --wait --timeout 180s
 "$python" - "$context" "$node" "${IMAGE_TAG:-secure-v6}" > .runtime/rendered.yaml <<'PYTHON'
 import ipaddress,json,subprocess,sys,yaml
 sys.path.insert(0,'scripts')
@@ -73,4 +62,4 @@ for service in spicedb spicedb-checks identity ingestion query control prometheu
 done
 "$python" scripts/wait-flink.py --context "$context" --name context-secure-v1
 "$python" scripts/check-service-boundaries.py --context "$context"
-kubectl --context "$context" -n context-graph get flinkdeployment,pods
+kubectl --context "$context" -n context-graph get deployments,pods

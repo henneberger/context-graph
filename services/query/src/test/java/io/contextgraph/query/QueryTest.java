@@ -6,6 +6,12 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class QueryTest {
  @TempDir Path dir;
+ @Test void placeholdersInsideLiteralsAndCastsArePreserved() {
+  var bound=IcebergQueries.bind("SELECT ':literal' AS text, :value::VARCHAR AS value, 'it''s :still_literal' AS escaped",Map.of("value","hello"));
+  assertEquals("SELECT ':literal' AS text, ?::VARCHAR AS value, 'it''s :still_literal' AS escaped",bound.sql());
+  assertEquals(List.of("hello"),bound.values());
+ }
+
  @Test @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="TEST_DUCKDB_EXTENSIONS", matches="true")
  void requiredExtensionsLoad() throws Exception {try(var c=IcebergQueries.connect(true); var s=c.createStatement();var r=s.executeQuery("SELECT count(*) FROM duckdb_extensions() WHERE extension_name IN ('iceberg','cache_httpfs') AND loaded")){assertTrue(r.next());assertEquals(2,r.getInt(1));}}
  @Test void historicalTimestampMatchesKafkaInstantIdentity() throws Exception {

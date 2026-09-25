@@ -1,5 +1,5 @@
 """Read-only namespace inventory. Never forwards arbitrary URLs, PromQL, or Kubernetes objects."""
-import concurrent.futures, json, os, ssl, threading, time, urllib.request, urllib.error
+import concurrent.futures, json, os, re, ssl, threading, time, urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import jwt, yaml
@@ -99,6 +99,26 @@ class Inventory:
         for f in data['flink']:
             s=f.get('status',{});j=s.get('jobStatus',{});spec=f['spec'];fc=spec.get('flinkConfiguration',{})
             jobs.append({'name':f['metadata']['name'],'state':j.get('state','UNKNOWN'),'jobId':j.get('jobId'),'reconciliation':s.get('reconciliationStatus',{}).get('state','UNKNOWN'),'parallelism':spec.get('job',{}).get('parallelism'),'version':spec.get('flinkVersion'),'image':spec.get('image'),'checkpointInterval':fc.get('execution.checkpointing.interval'),'incremental':fc.get('execution.checkpointing.incremental'),'savepointTimestamp':j.get('savepointInfo',{}).get('lastSavepoint',{}).get('timeStamp'),'restartFailed':fc.get('kubernetes.operator.job.restart.failed')})
+        # Discover native Flink applications from labeled Kubernetes Services.
+        # Never accept a caller-provided REST target.
+        def native_job(service):
+            name=service['metadata']['name']
+            selector=service['spec'].get('selector',{})
+            if not re.fullmatch(r'[a-z0-9-]+',name):return None
+            if selector.get('component') not in ('jm','jobmanager'):return None
+            if not any(p.get('port')==8081 for p in service['spec'].get('ports',[])):return None
+            entry={'name':selector.get('app',name),'state':'UNAVAILABLE','reconciliation':'KUBERNETES','image':None}
+            try:
+                overview=fetch('http://'+name+':8081/jobs/overview')['jobs']
+                if len(overview)==1:
+                    job=overview[0];entry.update(state=job['state'],jobId=job['jid'])
+                    checkpoints=fetch('http://'+name+':8081/jobs/'+job['jid']+'/checkpoints')
+                    entry['completedCheckpoints']=checkpoints.get('counts',{}).get('completed',0)
+                    entry['savepointTimestamp']=checkpoints.get('latest',{}).get('savepoint',{}).get('trigger_timestamp')
+            except Exception:pass
+            return entry
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            jobs.extend(j for j in pool.map(native_job,data['services']) if j)
         # Only deployed references and an explicit allowlist of configuration fields are returned.
         configs={c['metadata']['name']:c for c in data['configs']};definitions=[];seen=set()
         for obj in data['deployments']+data['flink']:
@@ -118,8 +138,12 @@ class Inventory:
                     if not isinstance(cfg,dict):continue
                     if path=='ingestion.json':detail={'endpoints':[{k:e.get(k) for k in ('path','name','kind','topic','schema','description')} for e in cfg.get('endpoints',[])],'errorTopic':cfg.get('errorTopic')}
                     elif path=='jobs.yaml':detail={k:cfg.get(k) for k in ('name','sourceTopics','outputs','aggregations','watermarkDelaySeconds','idleSeconds','consumerGroup')}
-                    else:detail={k:cfg.get(k) for k in ('queries','subscriptions','registeredTables')}
+                    else:detail={k:cfg.get(k) for k in ('queries','mutations','subscriptions','registeredTables')}
                     definitions.append({'service':obj['metadata']['name'],'configMap':name,'file':path,'definition':detail})
+        for config in data['configs']:
+            if config['metadata'].get('labels',{}).get('context-graph-inventory')=='true':
+                try:definitions.append({'service':config['metadata']['name'],'configMap':config['metadata']['name'],'file':'bundle.json','definition':json.loads(config['data']['bundle.json'])})
+                except (KeyError,ValueError):errors.append('invalid bundle inventory')
         services=[{'name':s['metadata']['name'],'type':s['spec'].get('type'),'ports':[{'name':p.get('name'),'port':p['port'],'protocol':p.get('protocol')} for p in s['spec'].get('ports',[])]} for s in data['services']]
         metrics={}
         try:

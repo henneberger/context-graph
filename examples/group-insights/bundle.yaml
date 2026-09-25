@@ -1,0 +1,44 @@
+version: 1
+name: group-insights
+workspace: demo
+description: Recent group activity views, ready for a delegated insight worker.
+inputs:
+  activity:
+    schema: schemas/activity.json
+  trajectories:
+    schema: schemas/trajectory.json
+jobs:
+  activity:
+    sources: [activity]
+    parallelism: 1
+    views:
+      activity_events:
+        sql: sql/activity.sql
+      recent_activity:
+        sql: sql/recent-activity.sql
+  trajectories:
+    sources: [trajectories]
+    parallelism: 1
+    views:
+      run_events:
+        sql: sql/trajectories.sql
+api:
+  queries:
+    recentActivity:
+      view: recent_activity
+      sql: sql/query.sql
+      parameters:
+        entityId: {type: string, required: false}
+        limit: {type: int, default: 50}
+    activityEvents:
+      view: activity_events
+      sql: sql/events-query.sql
+      parameters:
+        entityId: {type: string, required: false}
+        limit: {type: int, default: 50}
+  mutations:
+    recordActivity: {input: activity}
+    recordTrajectory: {input: trajectories}
+  subscriptions:
+    activityUpdated: {view: recent_activity}
+    trajectoryRecorded: {view: run_events}

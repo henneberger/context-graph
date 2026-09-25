@@ -17,6 +17,7 @@ public final class LiveBus implements AutoCloseable {
   private volatile boolean running=true, ready=false;
   public LiveBus(String bootstrap,Collection<String> topics,int buffer) {
     this.buffer=buffer;
+    if(topics.isEmpty()){consumer=null;thread=null;ready=true;return;}
     Properties p=KafkaSecurity.properties();p.put("bootstrap.servers",bootstrap);p.put("group.id","context-query-"+UUID.randomUUID());p.put("key.deserializer","org.apache.kafka.common.serialization.StringDeserializer");p.put("value.deserializer","org.apache.kafka.common.serialization.StringDeserializer");p.put("auto.offset.reset","latest");p.put("enable.auto.commit","true");p.put("isolation.level","read_committed");p.put("max.poll.records","250");p.put("allow.auto.create.topics","false");
     consumer=new KafkaConsumer<>(p);consumer.subscribe(topics);
     thread=Thread.ofPlatform().name("query-kafka").start(()-> {
@@ -35,5 +36,5 @@ public final class LiveBus implements AutoCloseable {
     return events.asFlux().filter(e->matches(e,topics,field,entity)).onBackpressureBuffer(buffer).publishOn(scheduler,1).filter(e->EventAuthorization.visible(e,context,permissions,entity))
       .map(e->{if(!wrap)return e.payload();Map<String,Object> out=new LinkedHashMap<>();out.put("topic",e.topic());out.put("entityId",e.payload().getOrDefault(field,e.payload().get("source_id")));out.put("payload",e.payload());return out;});
   }
-  public void close(){running=false;consumer.wakeup();try{thread.join(10000);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+  public void close(){running=false;if(consumer==null){ready=false;events.tryEmitComplete();return;}consumer.wakeup();try{thread.join(10000);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
 }

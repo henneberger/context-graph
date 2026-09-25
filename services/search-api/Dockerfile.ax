@@ -1,0 +1,3 @@
+FROM context-graph/search-api:search-v1
+COPY services/search-api/server.py services/search-api/investigation.py /app/
+COPY .build/ax /usr/local/bin/ax

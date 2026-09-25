@@ -53,11 +53,22 @@ public final class IcebergQueries {
     return c;
   }
   public static BoundSql bind(String sql,Map<String,Object> args) {
-    Matcher matcher=Pattern.compile("(?<!:):([A-Za-z][A-Za-z0-9_]*)").matcher(sql);
-    StringBuilder out=new StringBuilder(); List<Object> values=new ArrayList<>();
-    while(matcher.find()) {String name=matcher.group(1); Object value=args.get(name); if(name.equals("limit")) value=Math.min(10000,Math.max(1,value==null?100:((Number)value).intValue())); values.add(value);matcher.appendReplacement(out,"?");}
-    matcher.appendTail(out); return new BoundSql(out.toString(),values);
+    StringBuilder out=new StringBuilder();List<Object> values=new ArrayList<>();
+    boolean quoted=false;
+    for(int i=0;i<sql.length();) {
+      char ch=sql.charAt(i);
+      if(ch=='\'') {out.append(ch);i++;if(quoted&&i<sql.length()&&sql.charAt(i)=='\''){out.append(sql.charAt(i++));continue;}quoted=!quoted;continue;}
+      if(!quoted&&ch==':'&&i+1<sql.length()&&sql.charAt(i+1)==':'){out.append("::");i+=2;continue;}
+      if(!quoted&&ch==':'&&i+1<sql.length()&&Character.isLetter(sql.charAt(i+1))) {
+        int end=i+2;while(end<sql.length()&&(Character.isLetterOrDigit(sql.charAt(end))||sql.charAt(end)=='_'))end++;
+        String name=sql.substring(i+1,end);Object value=args.get(name);
+        if(name.equals("limit"))value=Math.min(10000,Math.max(1,value==null?100:((Number)value).intValue()));
+        values.add(value);out.append('?');i=end;
+      } else {out.append(ch);i++;}
+    }
+    return new BoundSql(out.toString(),values);
   }
+
   public static boolean registered(Table table, Policy policy) {
     if(policy==null)return false;
     var names=table.columns().stream().map(Column::name).collect(java.util.stream.Collectors.toSet());

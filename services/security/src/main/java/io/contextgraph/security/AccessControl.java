@@ -16,6 +16,7 @@ import java.util.*;
 public final class AccessControl {
     private static final ObjectMapper JSON=new ObjectMapper();
     private final String issuer,audience,spiceToken;
+    private final String requiredWorkspace;
     private final URI jwksUri,spiceUri;
     private final HttpClient http;
     private volatile JWKSet keys;
@@ -24,6 +25,7 @@ public final class AccessControl {
     public static AccessControl fromEnvironment() { return new AccessControl(System.getenv()); }
     AccessControl(Map<String,String> env) {
         boolean allowHttp="true".equals(env.get("SECURITY_ALLOW_HTTP"));
+        requiredWorkspace=env.get("REQUIRED_WORKSPACE");
         issuer=required(env,"OIDC_ISSUER"); audience=required(env,"OIDC_AUDIENCE"); spiceToken=required(env,"SPICEDB_TOKEN");
         endpoint(issuer,allowHttp);
         jwksUri=endpoint(required(env,"OIDC_JWKS_URL"),allowHttp);
@@ -38,6 +40,7 @@ public final class AccessControl {
     }
     public SecurityContext authenticate(String authorization,String workspaceId) {
         validateWorkspace(workspaceId);
+        if(requiredWorkspace!=null&&!requiredWorkspace.equals(workspaceId))throw new AuthException(403,"Workspace outside application scope");
         if(authorization==null || !authorization.startsWith("Bearer ") || authorization.length()>16384) throw new AuthException(401,"Valid Bearer credentials required");
         SecurityContext context;
         try {

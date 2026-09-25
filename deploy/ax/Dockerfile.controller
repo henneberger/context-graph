@@ -1,0 +1,3 @@
+FROM gcr.io/distroless/static-debian13:nonroot
+COPY .build/ax-controller /app/ax-controller
+ENTRYPOINT ["/app/ax-controller"]

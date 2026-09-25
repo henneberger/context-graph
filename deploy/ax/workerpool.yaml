@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: context-search
+---
+apiVersion: ate.dev/v1alpha1
+kind: WorkerPool
+metadata:
+  name: investigations
+  namespace: context-search
+  labels:
+    workload: investigations
+spec:
+  replicas: 1
+  workerImage: ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor
+  template:
+    nodeSelector:
+      ate.dev/substrate-version: '67253354'
+    resources:
+      requests: {cpu: 100m, memory: 512Mi}
+      limits: {cpu: '1', memory: 512Mi}

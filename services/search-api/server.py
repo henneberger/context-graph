@@ -137,6 +137,11 @@ def answer(token,query,source='all',since_days=0,emit=None,history=None):
     recheck(token,documents)
     if not documents:
         out={'blocks':[],'sources':[],'steps':steps,'model':MODEL,'insufficientEvidence':True};emit('done',out);return out
+    return synthesize(token,query,documents,steps,emit,conversation)
+
+def synthesize(token,query,documents,steps,emit,conversation=''):
+    if not documents:
+        result={'blocks':[],'sources':[],'steps':steps,'model':MODEL,'insufficientEvidence':True};emit('done',result);return result
     aliases={f'S{i+1}':d for i,d in enumerate(documents.values())}
     evidence=[{'id':key,**{k:d.get(k) for k in ('title','content','source','container','updatedAt')}} for key,d in aliases.items()]
     final_system=SYSTEM+' Start with the blocks key. Use only the short source IDs S1, S2, etc. provided below. Write 2–5 concise paragraphs, at most 8 blocks total. For broad questions, explain what the evidence establishes and explicitly state its limits. A bare project name means: explain this project. Do not return empty blocks merely because the evidence is partial. If only changes are available, say that the answer is based on changes rather than a complete project overview. Today is '+time.strftime('%Y-%m-%d',time.gmtime())+'.'
@@ -183,7 +188,13 @@ class Handler(BaseHTTPRequestHandler):
             REQUESTS.labels(self.path,str(status)).inc();self.event('error',{'status':status,'error':code})
         else:self.reply(status,{'error':code})
     def do_POST(self):
-        if self.path not in ('/api/search','/api/ask'):self.reply(404,{'error':'not_found'});return
+        if self.path.startswith('/internal/investigation/'):
+            from investigation import callback
+            try:callback(self)
+            except Denied as e:self.failure(e.status,e.code)
+            except Exception:self.failure(400,'invalid_task_request')
+            return
+        if self.path not in ('/api/search','/api/ask','/api/investigate'):self.reply(404,{'error':'not_found'});return
         if not SLOTS.acquire(False):self.reply(429,{'error':'busy'});return
         with DURATION.labels(self.path).time():
             try:
@@ -193,6 +204,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(body,dict):raise Denied(400,'invalid_request')
                 if self.path=='/api/search':
                     rows=search(token,body.get('query'),body.get('source','all'),since_days=body.get('sinceDays',0),sort=body.get('sort','relevance'));self.reply(200,{'results':[{k:v for k,v in d.items() if k!='content'} for d in rows],'ranking':'BM25 + bounded recency, title and document-type weighting'})
+                elif self.path=='/api/investigate':
+                    from investigation import investigate
+                    investigate(token,body,self.event)
+                    REQUESTS.labels(self.path,'200').inc()
                 elif 'text/event-stream' in self.headers.get('Accept',''):
                     gql(token,'{schemas{name}}') # Authenticate before opening a successful stream.
                     answer(token,body.get('query'),body.get('source','all'),body.get('sinceDays',0),self.event,body.get('history'))
@@ -204,5 +219,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:self.failure(503,'search_unavailable')
             finally:SLOTS.release()
 if __name__=='__main__':
+    import sys
+    sys.modules['server']=sys.modules[__name__]
     start_http_server(9404);server=ThreadingHTTPServer(('0.0.0.0',8443),Handler);server.daemon_threads=True
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.minimum_version=ssl.TLSVersion.TLSv1_2;context.load_cert_chain(ROOT/'server.crt',ROOT/'server.key');server.socket=context.wrap_socket(server.socket,server_side=True);server.serve_forever()

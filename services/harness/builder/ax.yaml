@@ -1,0 +1,30 @@
+# AX manifest, not a Kubernetes CRD. Apply with ax after installing the pinned
+# AX/Substrate stack and importing/publishing the builder image to its worker pool.
+# No Kubernetes, SpiceDB mutation, catalog, or provider credentials are supplied.
+apiVersion: ax.io/v1alpha1
+kind: Workspace
+metadata:
+  name: context-builder
+  atespace: default
+spec: {}
+---
+apiVersion: ax.io/v1alpha1
+kind: Task
+metadata:
+  name: context-builder
+  atespace: default
+spec:
+  image: context-graph/builder:harness-v1
+  command:
+    - /bin/sh
+    - -ec
+    - |
+      test -e /workspace/example/bundle.yaml || cg init /workspace/example
+      cg build /workspace/example/bundle.yaml --output /workspace/build-$(date +%s)
+  workspaces:
+    - name: context-builder
+      path: /workspace
+  resources:
+    requests: {cpu: '500m', memory: 1Gi}
+    limits: {cpu: '2', memory: 3Gi}
+  debug: false
