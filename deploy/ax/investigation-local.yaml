@@ -23,7 +23,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: search-api
-        image: context-graph/investigation-api:ax-v3
+        image: context-graph/investigation-api:ax-only-v2
         imagePullPolicy: IfNotPresent
         ports:
         - name: service
@@ -59,6 +59,8 @@ spec:
           value: knowledge
         - name: DEEPSEEK_MODEL
           value: deepseek-flash
+        - name: AX_CONCURRENCY
+          value: '2'
         - name: AX_SERVER
           value: host.docker.internal:28080
         - name: AX_ATESPACE

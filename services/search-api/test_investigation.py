@@ -1,5 +1,6 @@
 import hashlib,io,json,time,unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+from types import SimpleNamespace
 import investigation as inv
 import server
 class Handler:
@@ -32,6 +33,20 @@ class InvestigationTests(unittest.TestCase):
             self.assertTrue(inv.task_failed('run-a'))
             self.assertFalse(inv.task_failed('run-b'))
             self.assertFalse(inv.task_failed('run'))
+    def test_capacity_waits_and_releases_slot_after_failure(self):
+        slots=Mock();slots.acquire.side_effect=[False,True];events=[]
+        with patch.object(inv,'TASK_SLOTS',slots),patch.object(server,'gql'),patch.object(inv,'execute_investigation',side_effect=server.Denied(503)):
+            with self.assertRaises(server.Denied):inv.investigate('Bearer user',{'query':'mari'},lambda k,v:events.append((k,v)))
+        self.assertEqual(events[0][1]['message'],'Waiting for research capacity')
+        slots.release.assert_called_once()
+    def test_both_answer_routes_delegate_only_to_ax(self):
+        for route in ('/api/ask','/api/investigate'):
+            body={'query':'mari','history':['What changed?']};raw=json.dumps(body).encode()
+            handler=SimpleNamespace(path=route,headers={'Authorization':'Bearer user','Content-Length':str(len(raw))},rfile=io.BytesIO(raw),connection=Mock(),event=Mock(),failure=Mock(),reply=Mock())
+            with patch.object(inv,'investigate') as execute,patch.object(server,'search') as search:
+                server.Handler.do_POST(handler)
+                execute.assert_called_once_with('Bearer user',body,handler.event)
+                search.assert_not_called();handler.failure.assert_not_called()
     def test_missing_ax_fails_before_provider_call(self):
         with patch.dict('os.environ',{},clear=True),patch.object(server,'gql'),patch.object(server,'complete') as model:
             with self.assertRaises(server.Denied) as error:inv.investigate('Bearer user',{'query':'mari'},lambda *a:None)

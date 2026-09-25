@@ -249,7 +249,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: search-api
-        image: context-graph/search-api:search-v1
+        image: context-graph/search-api:ax-only-v1
         imagePullPolicy: IfNotPresent
         ports:
         - name: service
@@ -330,7 +330,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: search-ui
-        image: context-graph/search-ui:ax-v2
+        image: context-graph/search-ui:ax-only-v1
         imagePullPolicy: IfNotPresent
         ports:
         - name: service

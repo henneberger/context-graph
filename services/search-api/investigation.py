@@ -7,6 +7,7 @@ import base64,hashlib,ipaddress,json,os,queue,secrets,subprocess,threading,time
 from dataclasses import dataclass,field
 import server
 RUNS={};LOCK=threading.Lock()
+TASK_SLOTS=threading.BoundedSemaphore(max(1,min(4,int(os.environ.get('AX_CONCURRENCY','1')))))
 @dataclass
 class Run:
     token:str
@@ -46,13 +47,32 @@ def task_spec(name,cap,plans):
         'env':[{'name':k,'value':v} for k,v in values.items()], 'resources':{'requests':{'cpu':'100m','memory':'128Mi'},'limits':{'cpu':'1','memory':'256Mi'}},'debug':False}}
 
 def investigate(token,body,emit):
+    # Authenticate before exposing progress; bound the queue by HTTP request slots.
+    server.gql(token,'{schemas{name}}')
+    deadline=time.monotonic()+60
+    acquired=False
+    try:
+        while not acquired:
+            acquired=TASK_SLOTS.acquire(timeout=2)
+            if acquired:break
+            server.gql(token,'{schemas{name}}')
+            if time.monotonic()>=deadline:raise server.Denied(429,'busy')
+            emit('status',{'message':'Waiting for research capacity'})
+        return execute_investigation(token,body,emit)
+    finally:
+        if acquired:TASK_SLOTS.release()
+
+def execute_investigation(token,body,emit):
     query=body.get('query');source=body.get('source','all');days=body.get('sinceDays',0)
     if not isinstance(query,str) or not 1<=len(query.strip())<=500 or source not in ('all','github','slack') or type(days)!=int or not 0<=days<=3650:raise server.Denied(400,'invalid_query')
+    history=body.get('history',[])
+    if not isinstance(history,list) or len(history)>6 or any(not isinstance(q,str) or len(q)>500 for q in history):raise server.Denied(400,'invalid_history')
+    conversation='Previous user questions, for resolving follow-ups only: '+json.dumps(history)
     server.gql(token,'{schemas{name}}')
     if not all(os.environ.get(k) for k in ('AX_SERVER','AX_INVESTIGATOR_IMAGE','POD_IP')):raise server.Denied(503,'ax_unavailable')
     emit('status',{'message':'Planning an investigation'})
     plans=[{'query':query,'source':s,'days':days} for s in (('github','slack') if source=='all' else (source,))]
-    message=server.complete([{'role':'system','content':'Plan at most three additional lexical searches for this workplace investigation. Return JSON {"queries":["short keywords"]}. Do not answer the question.'},{'role':'user','content':query}])
+    message=server.complete([{'role':'system','content':'Plan at most three additional lexical searches for this workplace investigation. Return JSON {"queries":["short keywords"]}. Do not answer the question.'},{'role':'user','content':conversation},{'role':'user','content':query}])
     try:extra=json.loads(message.get('content','{}')).get('queries',[])
     except (ValueError,AttributeError):extra=[]
     if isinstance(extra,list):
@@ -63,17 +83,17 @@ def investigate(token,body,emit):
     with LOCK:RUNS[key]=run
     try:
         ax('apply','-f','-',payload=task_spec(name,cap,plans))
-        emit('status',{'message':'Starting AX investigation','taskId':name})
+        emit('status',{'message':'Searching your knowledge','taskId':name})
         while time.monotonic()<run.deadline:
             try:kind,data=run.events.get(timeout=4)
             except queue.Empty:
                 if task_failed(name):raise server.Denied(503,'ax_task_failed')
                 server.gql(token,'{schemas{name}}')
-                emit('status',{'message':'Waiting for AX investigation','taskId':name});continue
+                emit('status',{'message':'Gathering supporting sources','taskId':name});continue
             if kind=='finished':
                 server.recheck(token,run.documents)
                 emit('status',{'message':'Checking investigation sources'})
-                return server.synthesize(token,query,run.documents,run.steps,emit)
+                return server.synthesize(token,query,run.documents,run.steps,emit,conversation)
             if kind=='failed':raise server.Denied(data.get('status',503),data.get('code','ax_task_failed'))
             emit(kind,data)
         raise server.Denied(503,'ax_task_timeout')
