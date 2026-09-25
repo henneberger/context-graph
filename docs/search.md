@@ -9,6 +9,16 @@ kubectl --context docker-desktop -n context-graph port-forward svc/dashboard 180
 kubectl --context docker-desktop -n context-graph port-forward svc/control-ui 18089:8080
 ```
 
+## AX-powered conversation
+
+Every assistant question uses AX through the normal conversation UI. `POST /search/api/ask` is routed to the dedicated investigation coordinator. It authenticates the caller, plans retrieval, and submits an AX task to the Substrate worker pool. The worker retrieves through scoped callbacks; the coordinator uses the original caller's identity for every serving-API request and streams a cited answer from authorized evidence.
+
+The local pool runs two workers, with matching execution admission in the coordinator. Overlapping requests receive a waiting status until a slot is available. Follow-ups carry prior user questions into planning and retrieve current evidence again.
+
+The coordinator calls DeepSeek directly for planning and synthesis. The sandbox receives its retrieval capability, callback configuration, and trusted CA. The UI shows execution progress and answer sections as they arrive, with inline source references and the source panel.
+
+The [AX guide](ax-investigations.md) describes the component architecture, capability flow, builder integration, image builds, and development bridges. Start those bridges alongside the application forward when using the separate local AX cluster.
+
 ## Live ingestion
 
 `config/connectors/sources.yaml` limits GitHub to **MariHQ/mari**: issues, pull requests, their comments/review comments, the repository README, and default-branch commit history. Commit documents contain commit messages, not file diffs. Slack imports readable channel histories and replies. The first completed backfill indexed 472 GitHub documents and 49 Slack messages (47 in `test`, 2 in `private-test`). The bot is not a member of `all-mari`, `social`, `new-channel`, or `support`; these sources report `not_in_channel` and require a channel member to invite the bot before they can be indexed.
@@ -40,7 +50,7 @@ freshness = 2 ^ (-ageDays / halfLifeDays)
 
 Half-lives are 14 days for Slack messages, 45 for issues/PRs and 90 for commits. Exact query phrases in titles receive a 0.20 boost. Type weights are PR 1.15, issue 1.10, message 1.0 and commit 0.80. Every lexical match is rescored before selecting the top results. Invalid or implausibly future dates receive no freshness boost. Source/date filters and newest-first sorting are supported. This remains lexical retrieval; no embeddings are used.
 
-The default UI is a conversation, with live activity, inline citations, a source side panel and follow-up questions. Document search is available separately. DeepSeek Flash plans up to three additional keyword searches and returns short cited statements. Initial retrieval takes results from each permitted provider so short Slack messages cannot crowd out all repository evidence. Only authorized evidence is sent to DeepSeek. The tool loop cannot execute arbitrary actions or follow URLs. Source content is treated as untrusted data. Citation validation checks provenance and access, not whether every model interpretation is semantically correct. The integration uses JSON output and explicitly disables thinking for predictable response latency, following the [DeepSeek API documentation](https://api-docs.deepseek.com/api/create-chat-completion/).
+The default UI is a conversation, with live activity, inline citations, a source side panel and follow-up questions. Document search is available separately. The AX coordinator uses DeepSeek Flash to plan additional keyword searches and synthesize short cited statements after sandbox retrieval completes. Initial retrieval takes results from each permitted provider so short Slack messages cannot crowd out all repository evidence. Only authorized evidence is sent to DeepSeek. The investigator executes the coordinator's retrieval plan through authenticated callbacks. Source content is treated as untrusted data. Citation validation checks provenance and access, not whether every model interpretation is semantically correct. The integration uses JSON output and explicitly disables thinking for predictable response latency, following the [DeepSeek API documentation](https://api-docs.deepseek.com/api/create-chat-completion/).
 
 ## Operations and limits
 

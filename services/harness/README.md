@@ -68,7 +68,7 @@ Promotion changes API Service selectors. It does not transfer input events or Fl
 
 `builder/ax.yaml` is an AX manifest for invoking the same compiler tools. Build the pinned upstream runner with `scripts/build-ax-tools.sh`, then build `builder/Dockerfile`. AX receives workspace files and compiler tooling, not deployment credentials. The same client library can query and ingest using an explicitly delegated user identity.
 
-The Glean-like example's separate AX investigation path is documented in `docs/ax-investigations.md`. It executes bounded retrieval through run-specific capabilities and streams a permission-checked cited answer.
+The [AX execution guide](../../docs/ax-investigations.md) connects the builder workflow to the running assistant example. Every assistant question uses AX: the coordinator delegates retrieval through run-specific capabilities, checks the caller's permissions, and streams a cited answer. The same execution infrastructure can run the builder task with its own workspace and compiler tools.
 
 ## Current limits
 
