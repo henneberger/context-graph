@@ -110,6 +110,7 @@ These concerns have established foundations: [W3C PROV](https://www.w3.org/TR/pr
 | Live context | Kafka-backed GraphQL subscriptions with per-emission authorization | Clients must handle reconnects; this is not a durable client replay API |
 | Access | OIDC, SpiceDB, scoped transformations, authorization before SQL, protected media | Imported permission freshness depends on the adapter's synchronization policy |
 | Operations | Independent read-only control plane, Kubernetes inventory, job/query visibility, metrics | Current infrastructure is a local development deployment, with single-node dependencies |
+| Task execution | AX tasks and workspaces on Substrate; delegated API access; application-builder tooling | Applications define task behavior and output contracts |
 | Extension examples | Temporal source workers; permissioned BM25/freshness search; cited assistant; metrics/video UI | Provider mappings and search document projection are example-specific |
 
 ## Architecture
@@ -164,7 +165,21 @@ flowchart TB
     D --> W
     LIVE --> Q
   end
-  subgraph Reference_applications[Reference applications and extension points]
+  subgraph Task_execution[Platform task execution]
+    AX[AX server / controller]
+    RUN[Substrate sandbox workers]
+    BUILD[Application harness / cg]
+    BUNDLE[Application bundle]
+    RELEASE[Release workflow]
+    AX --> RUN
+    RUN --> BUILD
+    BUILD --> BUNDLE
+    BUNDLE --> RELEASE
+    RELEASE --> I
+    RELEASE --> F
+    RELEASE --> Q
+  end
+  subgraph Reference_applications[Packaged applications and extension points]
     APP[Your applications]
     SA[Example assistant API]
     LLM[DeepSeek]
@@ -172,6 +187,9 @@ flowchart TB
     DEMO[Example metrics / video dashboard]
     Q --> APP
     Q --> SA
+    APP --> AX
+    SA --> AX
+    RUN -->|scoped retrieval callbacks| SA
     SA --> LLM
     SA --> UI
     Q --> DEMO
@@ -208,9 +226,9 @@ flowchart TB
 
 </details>
 
-The serving API is the application integration boundary. The control plane has its own API and frontend. Reference applications also run as separate services; their browser routing is described under local setup.
+The serving API is the data-access boundary; AX supplies task execution and workspaces. Applications use delegated access to read or write through the platform APIs. The application harness produces reviewable release artifacts for provisioning and deployment. The control plane has its own API and frontend. Reference applications also run as separate services; their browser routing is described under local setup.
 
-The [platform architecture](docs/architecture.md), [lakehouse design](docs/lakehouse.md), and [example search application](docs/search.md) describe the individual paths. Earlier [interactive](docs/diagrams/context-graph-architecture.html), [SVG](docs/diagrams/context-graph-architecture.svg), and [PDF](docs/diagrams/context-graph-architecture.pdf) diagrams document the core platform; the diagram above includes the subsequently added connector and assistant services.
+The [platform architecture](docs/architecture.md), [AX task execution](docs/ax.md), [lakehouse design](docs/lakehouse.md), and [packaged search application](docs/search.md) describe the individual paths. Earlier [interactive](docs/diagrams/context-graph-architecture.html), [SVG](docs/diagrams/context-graph-architecture.svg), and [PDF](docs/diagrams/context-graph-architecture.pdf) diagrams document the core platform; the diagram above includes the subsequently added connector and assistant services.
 
 ### Data path
 
@@ -227,6 +245,7 @@ These are pinned repository versions, not an assertion that every component is t
 
 | Layer | Technology |
 |---|---|
+| Task runtime | AX and Substrate; pinned revisions in [upstream-lock.json](services/harness/builder/upstream-lock.json) |
 | Java services | Java 21, Vert.x 5.2.0 |
 | Streams | Kafka 4.1.1, Flink 2.3.0, Flink Kubernetes Operator 1.16.1 |
 | Tables / queries | Iceberg 1.11.0, DuckDB JDBC 1.5.5.1; `iceberg`, `cache_httpfs`, `fts` |

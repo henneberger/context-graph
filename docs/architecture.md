@@ -6,6 +6,20 @@ Java 21, Maven modules: services/ingestion (Vert.x 5.2.0), services/processor (F
 
 Ingestion validates incoming JSON against endpoint schemas and outgoing envelopes against an envelope schema. Topic per endpoint, error topic for invalid input/processing failures, acknowledgements only after Kafka confirms publishing. Media bytes remain outside Kafka. Streaming FFmpeg normalizes video to a bounded GOP, emits independently decodable HLS chunks, atomically exposes playlists and emits validated chunk metadata. Live streaming clients must reconnect on pod termination; draining has a finite bound.
 
+## Task execution
+
+AX supplies task definitions, workspaces, and execution coordination. Substrate runs task images in isolated sandboxes. These services form the platform's task runtime, alongside the ingestion, processing, storage, and serving layers.
+
+A task has an application-defined image, command, workspace, and delegated access contract. Application data is accessed through authenticated platform APIs. The caller's workspace and SpiceDB permissions continue to apply to reads and writes. Control-plane credentials belong to the deployment services; application tasks receive the access required for their work.
+
+The application harness packages the schema and SQL compiler as task tooling. Builder tasks produce reviewable bundles describing ingestion APIs, Kafka topics, Flink jobs, Iceberg outputs, and GraphQL operations. Provisioning and release use those artifacts to install the application. Applications can ingest task events through ordinary schema-validated endpoints, including the supplied trajectory endpoint.
+
+The shipped chat application demonstrates task execution with a retrieval coordinator. Every question creates an AX task, uses scoped callbacks to retrieve through the original user's identity, and streams an answer after checking evidence and citations. DeepSeek planning and synthesis belong to that application's coordinator. Other applications supply their own task logic, model access, and result presentation.
+
+The AX control plane, Substrate workers, application coordinator, and frontend are separate deployment units. Worker-pool capacity and coordinator admission are configured together; waiting work emits progress. The coordinator tracks the run, validates completion, revokes its delegated capability, and requests task cleanup. Operational metrics record request outcomes, duration, and model-call status without source content or credentials as labels.
+
+See [AX task execution](ax.md) for the component diagram, permissions, task lifecycle, builder workflow, configuration, and operating commands.
+
 ## Event contract
 
 All ingestion topics contain JSON objects with fields: eventId (UUID string), schemaVersion (integer, 2), endpoint (string), kind (json|image|video), entityId (string), eventTime (ISO-8601 UTC string), ingestedAt (ISO-8601 UTC string), payload (arbitrary JSON object), security:{workspaceId,resourceId,subjectId}. Servers derive and verify security provenance. Kafka key = workspaceId + NUL + resourceId. For JSON, entityId is required and eventTime may be supplied in the original body; payload preserves the original body. Default endpoint paths: POST /ingest/events -> cg.secure.events, POST /ingest/images -> cg.secure.images, POST /ingest/video -> cg.secure.video. Media entityId is required through X-Entity-Id; bearer identity and workspace authorization are mandatory; video stream ID and playlist returned through response headers. Image payload includes uri, width, height, contentType, bytes, sha256. Video payload includes streamId, sequence, uri, playlistUri, durationSeconds and keyframeAligned. Media URIs use /media/... and private RustFS objects; /data/media is bounded pod-local FFmpeg staging. Server-owned sidecars bind each file to its entity; every file/range/playlist request verifies identity and current permission. Media transfers stop on token expiry or observed revocation; nginx proxies media to ingestion rather than serving a file alias.
