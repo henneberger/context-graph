@@ -65,6 +65,7 @@ for d in documents(node=a.node,image_tag='schema-v1'):
 for d in selected:
  if d['kind']=='Deployment' and d['metadata']['name'].startswith('context-secure-v1-'):
   env=d['spec']['template']['spec']['containers'][0]['env']
+  next(e for e in env if e['name']=='JOB_ID')['value']='context-secure-'+reset_id
   properties=next(e for e in env if e['name']=='FLINK_PROPERTIES')
   values=yaml.safe_load(properties['value'])
   values.update({'high-availability.cluster-id':reset_id,'kubernetes.cluster-id':reset_id,'high-availability.storageDir':'s3://context-recovery/ha/'+reset_id})
