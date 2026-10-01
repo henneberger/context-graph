@@ -1,0 +1,10 @@
+name: context-bronze-lake-v1
+namespace: bronze
+# Discover new application and Debezium Postgres topics automatically.
+# Use a separate namespace/job per Kafka cluster to keep topic identities unique.
+topicPattern: '^(cg\..*|postgres\.[^.]+\.[^.]+)$'
+parallelism: 2
+checkpointIntervalMs: 30000
+topicDiscoveryIntervalMs: 30000
+# Debezium JSON topics use primary-key upserts; all others retain history.
+cdcTopicPattern: '^postgres\.[^.]+\.[^.]+$'

@@ -8,6 +8,8 @@ Context Graph connects ingestion, stream processing, a relational lakehouse, SQL
 
 Application data is stored in schema-derived Iceberg tables. Application schemas and SQL transformations define relationships, classifications, and extracted information.
 
+For lake ingestion without Flink SQL, [DynamicLakeJob](services/processor/LAKE.md) discovers Kafka topics and creates Iceberg tables automatically. It archives arbitrary Kafka records and applies Debezium Postgres CDC updates and deletes to current-row tables. Start with [config/lake.yaml](config/lake.yaml).
+
 Slack and GitHub are example ingestion adapters. Workplace search/chat and the metrics/video dashboard are reference applications. AX task execution and the application harness are shared platform capabilities.
 
 [![Platform architecture](docs/diagrams/context-graph-overview.svg)](docs/diagrams/context-graph-overview.svg)

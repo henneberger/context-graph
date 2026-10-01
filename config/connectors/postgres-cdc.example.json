@@ -1,0 +1,26 @@
+{
+  "name": "postgres-lake",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres.example.internal",
+    "database.port": "5432",
+    "database.user": "lake_replication",
+    "database.password": "${file:/run/secrets/postgres.properties:password}",
+    "database.dbname": "application",
+    "database.sslmode": "verify-full",
+    "database.sslrootcert": "/run/secrets/postgres-ca.crt",
+    "topic.prefix": "postgres",
+    "plugin.name": "pgoutput",
+    "slot.name": "context_lake",
+    "publication.name": "context_lake",
+    "publication.autocreate.mode": "disabled",
+    "snapshot.mode": "initial",
+    "tombstones.on.delete": "true",
+    "unavailable.value.placeholder": "__debezium_unavailable_value",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter.schemas.enable": "true"
+  }
+}
