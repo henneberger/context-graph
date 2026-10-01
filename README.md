@@ -6,7 +6,7 @@
 
 Context Graph connects ingestion, stream processing, a relational lakehouse, SQL-backed APIs, and isolated task execution. Applications supply their JSON Schemas, SQL, and behavior. The platform supplies validation, transport, storage, permissions, and operational visibility.
 
-Application data is stored in schema-derived Iceberg tables. Application schemas and SQL transformations define relationships, classifications, and extracted information.
+Data lands in Iceberg through dynamic lake ingestion or schema-defined application jobs. Application schemas and SQL transformations define relationships, classifications, and extracted information.
 
 For lake ingestion without Flink SQL, [DynamicLakeJob](services/processor/LAKE.md) discovers Kafka topics and creates Iceberg tables automatically. It archives arbitrary Kafka records and applies Debezium Postgres CDC updates and deletes to current-row tables. Start with [config/lake.yaml](config/lake.yaml).
 
@@ -14,7 +14,32 @@ Slack and GitHub are example ingestion adapters. Workplace search/chat and the m
 
 [![Platform architecture](docs/diagrams/context-graph-overview.svg)](docs/diagrams/context-graph-overview.svg)
 
-## JSON Schema is the contract
+## Build a lake with DataStream
+
+`DynamicLakeJob` uses Flink's DataStream API and `DynamicIcebergSink`. One Kafka topic-pattern subscription feeds one sink, which creates a separate Iceberg table for each matching topic as records arrive. Newly discovered topics need no per-topic SQL or DDL.
+
+| Input | Iceberg behavior | Stored payload |
+| --- | --- | --- |
+| Arbitrary Kafka topic | Append every record, including tombstones | Original key/value bytes, ordered headers, topic, partition, offset, timestamp |
+| Postgres CDC through Debezium Kafka topics | Snapshot and insert events upsert rows; updates replace rows by primary key; deletes remove rows | Canonical JSON primary key and the latest row in `row_json`, with Kafka source coordinates |
+
+Configure the topic pattern, CDC topic pattern, namespace, parallelism, and checkpoint interval in [config/lake.yaml](config/lake.yaml). The example subscribes to `cg.*` and `postgres.<schema>.<table>`. Each topic maps to `topic_` plus its UTF-8 name encoded as lowercase hexadecimal, avoiding punctuation and case collisions.
+
+With Java 21 and the Kafka/catalog credentials configured, build and submit:
+
+```sh
+mvn -pl services/processor -am package -DskipTests
+flink run -c io.contextgraph.processor.DynamicLakeJob \
+  services/processor/target/processor.jar config/lake.yaml
+```
+
+Set `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_CLIENT_CONFIG` (SASL_SSL properties), and a durable `CHECKPOINT_URI`. Production catalog access uses `POLARIS_URI`, `POLARIS_WAREHOUSE`, and `POLARIS_CREDENTIAL`. Restore checkpoint/savepoint state on restart to resume Kafka offsets. The job runs separately from the application SQL jobs.
+
+Postgres capture uses the [Debezium connector example](config/connectors/postgres-cdc.example.json). Configure logical replication, a publication, primary keys, and `REPLICA IDENTITY FULL` on captured tables. Keep Debezium JSON envelopes intact and preserve event order for each key. The job rejects unsupported CDC operations such as truncate and incomplete updates.
+
+Payload fields are not automatically promoted to typed Iceberg columns: generic records remain bytes and current CDC rows remain JSON. Keep these lake tables in a restricted namespace; application row authorization is supplied by the separate application processing/query path. See [lake setup, recovery, limitations, and validation](services/processor/LAKE.md) for the full operating contract. The live Postgres/Kafka/Polaris path still requires deployment validation.
+
+## JSON Schema for application jobs
 
 Each input endpoint has a JSON Schema and a Kafka topic. Vert.x validates input and stamps authenticated transport metadata. Flink validates again, maps declared fields into relational columns, and persists the dataset to Iceberg. Additional processing is defined in SQL.
 
@@ -40,7 +65,7 @@ profile                  STRUCT
 _json_remainder          VARIANT {"observations":[1,"two",null,{"ok":true}]}
 ```
 
-Declared strings, booleans, bounded integers, exact bounded decimals, nested objects, and arrays get corresponding physical types. Unconstrained and heterogeneous values remain VARIANT. Iceberg tables use format version 3. Schema validation remains authoritative: a remainder does not permit keys forbidden by the schema.
+Declared strings, booleans, bounded integers, exact bounded decimals, nested objects, and arrays get corresponding physical types. Unconstrained and heterogeneous values remain VARIANT. These schema-defined application tables use Iceberg format version 3. Schema validation remains authoritative: a remainder does not permit keys forbidden by the schema.
 
 See the [mapping contract, numeric handling, and reserved columns](docs/json-schema-storage.md).
 
@@ -50,7 +75,7 @@ See the [mapping contract, numeric handling, and reserved columns](docs/json-sch
 | --- | --- |
 | Vert.x ingestion | Configured endpoints; JSON Schema validation; authenticated metadata; image and video ingestion |
 | Kafka | Separate input topics; error queues; commands and live output streams; scoped service ACLs |
-| Flink | Schema adapters, application SQL, event-time computation, Iceberg and Kafka outputs |
+| Flink | DataStream dynamic lake ingestion, CDC upserts, schema adapters, application SQL, and Kafka outputs |
 | Iceberg + Polaris | Relational tables, snapshots, catalog metadata, and service credential vending |
 | RustFS | Private local S3 object storage for warehouse files, media, and recovery state |
 | DuckDB | SQL serving through `iceberg` and `cache_httpfs`; authorized inputs before query execution |
