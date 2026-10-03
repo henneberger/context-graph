@@ -70,11 +70,15 @@ public final class QueryService {
       JsonNode q=entry.getValue();Map<String,IcebergQueries.Source> sources=new LinkedHashMap<>();
       if(q.has("sources"))q.path("sources").fields().forEachRemaining(e->{String name=e.getValue().asText();if(!policies.containsKey(name))throw new SecurityException("Unregistered federated table");sources.put(e.getKey(),new IcebergQueries.Source(tables.get(name),policies.get(name)));});
       else {String name=q.path("table").asText();if(!policies.containsKey(name))throw new SecurityException("Unregistered query table");sources.put("source",new IcebergQueries.Source(tables.get(name),policies.get(name)));}
-      IcebergQueries.validateSources(sources.keySet());SafeSql.validate(q.path("sql").asText(),sources.keySet());
+      IcebergQueries.validateSources(sources.keySet());
+      OrchidQueries orchid=q.path("engine").asText().equals("orchiddb")?
+          OrchidQueries.configured(config.path("graphs").path(q.path("graph").asText()),q,sources.keySet()):null;
+      if(orchid!=null){orchid.validatePolicies(sources);OrchidQueries.checkNative();}else SafeSql.validate(q.path("sql").asText(),sources.keySet());
       sdl.append(q.path("signature").asText()).append('\n');
       query.dataFetcher(entry.getKey(),env->CompletableFuture.supplyAsync(()->{try{
         List<Map<String,Object>> rows;
-        if(q.has("sources"))rows=db.federate(sources,q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        if(orchid!=null)rows=db.graph(sources,orchid,env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
+        else if(q.has("sources"))rows=db.federate(sources,q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);
         else {var source=sources.get("source");
         rows=db.execute(source.table(),source.policy(),q.path("sql").asText(),env.getArguments(),env.getGraphQlContext().get("security"),permissions,limits);}
         if(q.path("engine").asText().equals("bm25")||q.path("engine").asText().equals("documents"))return DocumentSearch.execute(rows,env.getArguments(),q.path("engine").asText().equals("documents"),env.getGraphQlContext().get("security"),permissions,q.path("ranking"));

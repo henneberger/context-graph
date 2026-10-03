@@ -1,12 +1,14 @@
 # Context Graph
 
-**A platform for building permissioned applications on streaming, schema-defined data.**
+**A platform for building permissioned context graphs and applications on streaming, schema-defined data.**
 
 > **Proprietary software — non-free and not open source.** Copyright © 2026 Daniel Henneberger. All rights reserved. Use, modification, hosting, and redistribution require a separate written license. See [LICENSE](LICENSE). Third-party components retain their own licenses.
 
-Context Graph connects ingestion, stream processing, a relational lakehouse, SQL-backed APIs, and isolated task execution. Applications supply their JSON Schemas, SQL, and behavior. The platform supplies validation, transport, storage, permissions, and operational visibility.
+Context Graph connects ingestion, stream processing, a relational lakehouse, graph and SQL queries, permissioned APIs, and isolated task execution. Applications supply their JSON Schemas, SQL, graph and ontology mappings, and behavior. The platform supplies validation, transport, storage, permissions, and operational visibility.
 
 Data lands in Iceberg through dynamic lake ingestion or schema-defined application jobs. Application schemas and SQL transformations define relationships, classifications, and extracted information.
+
+[OrchidDB](services/query/README.md#orchiddb-graph-queries) adds Cypher, Gremlin, and ontology-mapped SPARQL queries over permission-filtered data on the existing DuckDB engine. To get the most from ontology layers, separate physical table/column mappings from a shared domain vocabulary: use stable class and predicate IRIs, explicit subject identities, and named relationships with defined endpoints; reuse those mappings across applications so storage changes do not rewrite business queries. Keep graph IDs unique and stable, version mappings alongside schemas, and test vocabulary queries against representative data and permissions. Ontology mappings describe meaning and relationships; derive classifications or inferred facts explicitly in processing jobs. See the [ontology example](examples/ontology/queries.yaml) and [graph growth and compiler setup](services/query/README.md#growing-the-context-graph).
 
 For lake ingestion without Flink SQL, [DynamicLakeJob](services/processor/LAKE.md) discovers Kafka topics and creates Iceberg tables automatically. It archives arbitrary Kafka records and applies Debezium Postgres CDC updates and deletes to current-row tables. Start with [config/lake.yaml](config/lake.yaml).
 

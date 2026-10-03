@@ -89,10 +89,22 @@ public final class IcebergQueries {
     }
   }
   public record Source(Table table,Policy policy) {}
+  @FunctionalInterface
+  interface AuthorizedOperation { List<Map<String,Object>> run(Connection connection,long deadline) throws Exception; }
   /** Each connector materializes authorized rows before they enter the credential-free join engine. */
   public List<Map<String,Object>> federate(Map<String,Source> sources,String sql,Map<String,Object> args,
       SecurityContext context,PermissionChecks permissions,Limits limits) throws Exception {
     validateSources(sources.keySet()); SafeSql.validate(sql,sources.keySet());
+    return withAuthorizedSources(sources,(c,deadline)->run(c,bind(sql,args)),context,permissions,limits);
+  }
+  List<Map<String,Object>> graph(Map<String,Source> sources,OrchidQueries query,Map<String,Object> args,
+      SecurityContext context,PermissionChecks permissions,Limits limits)throws Exception {
+    query.validatePolicies(sources);
+    return withAuthorizedSources(sources,(c,deadline)->query.execute(c,args,limits,deadline),context,permissions,limits);
+  }
+  private List<Map<String,Object>> withAuthorizedSources(Map<String,Source> sources,AuthorizedOperation operation,
+      SecurityContext context,PermissionChecks permissions,Limits limits)throws Exception {
+    validateSources(sources.keySet());
     long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(limits.timeoutSeconds());
     Map<String,List<Map<String,Object>>> inputs=new LinkedHashMap<>();
     int total=0;
@@ -105,7 +117,7 @@ public final class IcebergQueries {
       inputs.put(entry.getKey(),rows);
     }
     checkDeadline(deadline);
-    return joinAuthorized(sources,inputs,sql,args,context,permissions,limits,deadline);
+    return joinAuthorized(sources,inputs,operation,context,permissions,limits,deadline);
   }
   static void validateSources(Set<String> names) {
     if(names.isEmpty()||names.size()>8)throw new IllegalArgumentException("One to eight sources required");
@@ -114,7 +126,12 @@ public final class IcebergQueries {
   private static final class JsonType {static JsonNode parse(String value){try{return JSON.readTree(value);}catch(Exception e){throw new IllegalArgumentException(e);}}}
   static List<Map<String,Object>> joinAuthorized(Map<String,Source> sources,Map<String,List<Map<String,Object>>> inputs,
       String sql,Map<String,Object> args,SecurityContext context,PermissionChecks permissions,Limits limits,long deadline)throws Exception {
-    validateSources(sources.keySet());SafeSql.validate(sql,sources.keySet());permissions.workspace(context,"access");
+    SafeSql.validate(sql,sources.keySet());
+    return joinAuthorized(sources,inputs,(c,end)->run(c,bind(sql,args)),context,permissions,limits,deadline);
+  }
+  static List<Map<String,Object>> joinAuthorized(Map<String,Source> sources,Map<String,List<Map<String,Object>>> inputs,
+      AuthorizedOperation operation,SecurityContext context,PermissionChecks permissions,Limits limits,long deadline)throws Exception {
+    validateSources(sources.keySet());permissions.workspace(context,"access");
     Set<String> contributors=new HashSet<>();int total=0;
     // A fresh database never receives catalog handles or storage credentials.
     try(Connection c=connect(false);Statement statement=c.createStatement()) {
@@ -143,7 +160,7 @@ public final class IcebergQueries {
       }
       for(String resource:contributors){checkDeadline(deadline);permissions.require(context,resource);}
       statement.execute("SET lock_configuration=true");
-      var result=run(c,bind(sql,args));
+      var result=operation.run(c,deadline);
       permissions.workspace(context,"access");for(String resource:contributors){checkDeadline(deadline);permissions.require(context,resource);}
       checkDeadline(deadline);return result;
     }
@@ -202,12 +219,16 @@ public final class IcebergQueries {
     return value;
   }
   static List<Map<String,Object>> run(Connection c,BoundSql bound) throws Exception {
+    return run(c,bound,Integer.MAX_VALUE,System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(30));
+  }
+  static List<Map<String,Object>> run(Connection c,BoundSql bound,int maxRows,long deadline) throws Exception {
+    checkDeadline(deadline);
     try(PreparedStatement p=c.prepareStatement(bound.sql())) {
-      p.setQueryTimeout(30);
+      p.setQueryTimeout((int)Math.max(1,java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(deadline-System.nanoTime())+1));
       for(int i=0;i<bound.values().size();i++) p.setObject(i+1,bound.values().get(i));
       try(ResultSet rs=p.executeQuery()) {
         List<Map<String,Object>> rows=new ArrayList<>(); ResultSetMetaData meta=rs.getMetaData();
-        while(rs.next()) {Map<String,Object> row=new LinkedHashMap<>();for(int i=1;i<=meta.getColumnCount();i++) {
+        while(rs.next()) {checkDeadline(deadline);if(rows.size()>=maxRows)throw new IllegalStateException("Query result row limit exceeded");Map<String,Object> row=new LinkedHashMap<>();for(int i=1;i<=meta.getColumnCount();i++) {
           Object value=rs.getObject(i);String name=meta.getColumnLabel(i);
           value=normalizeValue(value);
           if(value instanceof String s && (name.equals("payload")||name.equals("properties"))) {try {value=JSON.readValue(s,Object.class);}catch(Exception ignored){}}

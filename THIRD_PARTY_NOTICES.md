@@ -4,6 +4,10 @@ The proprietary license in this repository applies to original Context Graph mat
 
 Dependency manifests and lockfiles identify the Java, Python, and JavaScript packages used by the services. Container images also contain third-party software and notices. This document does not replace their individual license files or constitute an exhaustive distribution compliance inventory.
 
+## OrchidDB
+
+The query service uses [OrchidDB Java](https://github.com/OrchidDB/OrchidDB-java) and the [OrchidDB compiler](https://github.com/OrchidDB/OrchidDB), version 0.1.0, under their GPL-3.0-only license. The Java release revision is `0b96a940185f757f60c97bf47ef0170990fe3857`; its compiler revision is `18ad70a9ad461e126a739b5c99f10c13622f33e6`. Native classifier JARs include the upstream `META-INF/LICENSE.md`.
+
 ## shadcn/ui components
 
 The components under `services/search-ui/src/components/ui/` were generated from shadcn/ui and adapted for this application. The upstream license is reproduced below.

@@ -1,0 +1,71 @@
+# Use as QUERY_CONFIG's `queries` file after publishing these registered tables.
+registeredTables:
+  context_secure.people:
+    entityColumn: entity_id
+  context_secure.knows:
+    entityColumn: source_entity_id
+    targetEntityColumn: target_entity_id
+
+types: |
+  type Friend { name: String! }
+  type PersonCount { total: Long! }
+
+graphs:
+  people:
+    nodes:
+      - label: Person
+        source: people
+        id: person_id
+        properties:
+          name: full_name
+          iri: person_iri
+    edges:
+      - label: KNOWS
+        source: knows
+        id: edge_id
+        sourceColumn: from_id
+        targetColumn: to_id
+        sourceLabel: Person
+        targetLabel: Person
+    ontology:
+      classes:
+        - {iri: 'https://example.org/Person', label: Person, identity: iri}
+      properties:
+        - {iri: 'https://example.org/name', label: Person, property: name}
+      relationships:
+        - iri: https://example.org/knows
+          label: KNOWS
+          sourceLabel: Person
+          targetLabel: Person
+
+queries:
+  friends:
+    signature: 'friends(name: String!): [Friend!]!'
+    engine: orchiddb
+    graph: people
+    language: cypher
+    sources: &sources
+      people: context_secure.people
+      knows: context_secure.knows
+    query: >-
+      MATCH (a:Person)-[:KNOWS]->(b:Person)
+      WHERE a.name = $name RETURN b.name AS name ORDER BY name LIMIT 100
+  vocabularyFriends:
+    signature: 'vocabularyFriends: [Friend!]!'
+    engine: orchiddb
+    graph: people
+    language: sparql
+    sources: *sources
+    query: >-
+      PREFIX ex: <https://example.org/>
+      SELECT ?name WHERE {
+        ?a a ex:Person . ?a ex:name "Ada" .
+        ?a ex:knows ?b . ?b a ex:Person . ?b ex:name ?name .
+      } ORDER BY ?name
+  personCount:
+    signature: 'personCount: [PersonCount!]!'
+    engine: orchiddb
+    graph: people
+    language: cypher
+    sources: *sources
+    query: 'MATCH (p:Person) RETURN count(p) AS total'
